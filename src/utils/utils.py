@@ -2,6 +2,28 @@ import time
 import numpy as np
 import torch
 import torchvision
+import datetime
+import os
+import platform
+import logging
+import subprocess
+from pathlib import Path
+
+logger = logging.getLogger(__name__)
+
+def date_modified(path=__file__):
+    # return human-readable file modification date, i.e. '2021-3-26'
+    t = datetime.datetime.fromtimestamp(Path(path).stat().st_mtime)
+    return f'{t.year}-{t.month}-{t.day}'
+
+
+def git_describe(path=Path(__file__).parent):  # path must be a directory
+    # return human-readable git description, i.e. v5.0-5-g3e25f1e https://git-scm.com/docs/git-describe
+    s = f'git -C {path} describe --tags --long --always'
+    try:
+        return subprocess.check_output(s, shell=True, stderr=subprocess.STDOUT).decode()[:-1]
+    except subprocess.CalledProcessError as e:
+        return ''  # not a git repository
 
 
 def select_device(device='', batch_size=None):
