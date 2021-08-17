@@ -8,8 +8,8 @@ import torch
 
 from deep_sort.tracker import Tracker
 from deep_sort import nn_matching
-from utils.encoder import create_box_encoder
-from utils import utils
+from my_utils.encoder import create_box_encoder
+from my_utils import utils
 from deep_sort import detection
 
 
