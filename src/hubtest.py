@@ -1,5 +1,5 @@
 import argparse
-from yolov5.models.experimental import load_model
+from models.experimental import load_model
 import torch
 
 def run(
