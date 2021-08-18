@@ -7,7 +7,7 @@ def run(
     source='frames',  # file/dir/URL/glob, 0 for webcam
     imgsz=640,  # inference size (pixels)
     output_dir='out', 
-    device='',  # cuda device, i.e. 0 or 0,1,2,3 or cpu
+    device='cpu',  # cuda device, i.e. 0 or 0,1,2,3 or cpu
     conf_thres=0.5,  # confidence threshold
     iou_thres=0.45,  # NMS IOU threshold
     half=False,  # use FP16 half-precision inference

@@ -9,6 +9,7 @@ import torch
 from deep_sort.tracker import Tracker
 from deep_sort import nn_matching
 from my_utils.encoder import create_box_encoder
+from models.experimental import attempt_load
 from my_utils.my_dataset import LoadImages
 from my_utils import utils
 from deep_sort import detection
@@ -19,14 +20,14 @@ def run(
     source='frames',  # file/dir/URL/glob, 0 for webcam
     imgsz=640,  # inference size (pixels)
     output_dir='out', 
-    device='',  # cuda device, i.e. 0 or 0,1,2,3 or cpu
+    device='cpu',  # cuda device, i.e. 0 or 0,1,2,3 or cpu
     conf_thres=0.5,  # confidence threshold
     iou_thres=0.45,  # NMS IOU threshold
     half=False,  # use FP16 half-precision inference
 
 ):
 
-    model = torch.hub.load('ultralytics/yolov5', 'custom', path=weights) 
+    model = attempt_load(weights, map_location=device)  # load FP32 model
     stride = int(model.stride.max())  # model stride
     model.conf = conf_thres
     model.iou = iou_thres
@@ -114,7 +115,7 @@ def parse_opt():
     parser.add_argument('--source', type=str, default='data/images', help='file/dir/URL/glob, 0 for webcam')
     parser.add_argument('--conf-thres', type=float, default=0.25, help='confidence threshold')
     parser.add_argument('--iou-thres', type=float, default=0.45, help='NMS IoU threshold')
-    parser.add_argument('--device', default='', help='cuda device, i.e. 0 or 0,1,2,3 or cpu')
+    parser.add_argument('--device', default='cpu', help='cuda device, i.e. 0 or 0,1,2,3 or cpu')
     parser.add_argument('--half', action='store_true', help='use FP16 half-precision inference, supported on CUDA only')
     opt = parser.parse_args()
     return opt
