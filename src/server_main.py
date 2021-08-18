@@ -1,6 +1,6 @@
 import argparse
-from pathlib import Path
 
+from pathlib import Path
 import cv2
 import datetime
 from tqdm import tqdm
