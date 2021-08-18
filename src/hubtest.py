@@ -1,5 +1,5 @@
 import argparse
-from models.experimental import load_model
+from models.experimental import attempt_load
 import torch
 
 def run(
@@ -14,7 +14,7 @@ def run(
 
 ):
 
-    model = load_model.attempt_load(weights, map_location=device)  # load FP32 model
+    model = attempt_load(weights, map_location=device)  # load FP32 model
     stride = int(model.stride.max())  # model stride
 
 
