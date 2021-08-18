@@ -1,4 +1,5 @@
-import argparsew
+import argparse
+from yolov5.models.experimental import load_model
 import torch
 
 def run(
@@ -13,7 +14,7 @@ def run(
 
 ):
 
-    model = torch.hub.load('ultralytics/yolov5', 'custom', path=weights) 
+    model = load_model.attempt_load(weights, map_location=device)  # load FP32 model
     stride = int(model.stride.max())  # model stride
 
 
