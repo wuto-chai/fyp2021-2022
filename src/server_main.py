@@ -18,7 +18,6 @@ from deep_sort import detection
 def run(
     weights='yolov5l_best.pt',  # model.pt path(s)
     source='frames',  # file/dir/URL/glob, 0 for webcam
-    imgsz=640,  # inference size (pixels)
     output_dir='out', 
     device='cpu',  # cuda device, i.e. 0 or 0,1,2,3 or cpu
     conf_thres=0.5,  # confidence threshold
@@ -43,11 +42,15 @@ def run(
     use_gpu = True
     metric = nn_matching.NearestNeighborDistanceMetric("cosine", max_cosine_distance, nn_budget)
     tracker = Tracker(metric)
-    dataset = LoadImages(source, img_size=imgsz, stride=stride)
-    
-    p = Path(output_dir) / 'output.txt'
+    dataset = LoadImages(source, img_size=640, stride=stride)
+    dir_path = Path(output_dir)
+    file_path = Path('output.txt')
+    dir_path.mkdir(exist_ok=True)
+    p = Path(output_dir) / file_path
     with p.open('a') as f:
         for _, img, im0s, _, frame_idx in dataset:
+            if frame_idx < 870:
+                continue
             img = torch.from_numpy(img).to(device)
             img = img.half() if half else img.float()  # uint8 to fp16/32
             img /= 255.0  # 0 - 255 to 0.0 - 1.0
@@ -55,9 +58,14 @@ def run(
                 img = img.unsqueeze(0)
 
             bgr_image = im0s
+
             
-            results = model(img)
+            results = model(img)[0]
             results = utils.non_max_suppression(results)
+            #if(results[0].shape[0]==0):
+            #    continue
+
+            print(results)
             if(results.xywh[0].shape[0] == 0):
                 continue
             xywh_boxes = results.xywh[0][:,:-2]

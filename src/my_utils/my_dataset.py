@@ -97,7 +97,7 @@ class LoadImages:  # for inference
 
             self.frame += 1
             self.total_frames += 1
-            print(f'video {self.count + 1}/{self.nf} ({self.frame}/{self.frames}) {path}: ', end='')
+            print(f'video {self.count + 1}/{self.nf} ({self.frame}/{self.frames}) {path}: ')
 
         else:
             # Read image
@@ -105,7 +105,7 @@ class LoadImages:  # for inference
             self.total_frames += 1
             img0 = cv2.imread(path)  # BGR
             assert img0 is not None, 'Image Not Found ' + path
-            print(f'image {self.count}/{self.nf} {path}: ', end='')
+            print(f'image {self.count}/{self.nf} {path}: ')
 
         # Padded resize
         #img = letterbox(img0, self.img_size, stride=self.stride)[0]
