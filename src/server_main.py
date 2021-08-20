@@ -68,7 +68,8 @@ def run(
 
             
             xyxy = results[0][:,:-2]
-            xywh_boxes = (utils.xyxy2xywh(torch.tensor(xyxy).view(1, 4))).view(-1)
+            xywh_boxes = utils.xyxy2xywh(xyxy)
+            print(xywh_boxes)
             tlwh_boxes = utils.xywh2tlwh(xywh_boxes)
             confidence = results[0][:, -2]
             if use_gpu:
