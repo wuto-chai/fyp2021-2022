@@ -23,7 +23,7 @@ def run(
     conf_thres=0.5,  # confidence threshold
     iou_thres=0.45,  # NMS IOU threshold
     half=False,  # use FP16 half-precision inference
-
+    save_img=False,
 ):
 
     model = attempt_load(weights, map_location=device)  # load FP32 model
@@ -45,10 +45,11 @@ def run(
     dataset = LoadImages(source, img_size=640, stride=stride)
     dir_path = Path(output_dir)
     file_path = Path('output.txt')
+
     dir_path.mkdir(exist_ok=True)
     p = Path(output_dir) / file_path
     with p.open('a') as f:
-        for _, img, im0s, _, frame_idx in dataset:
+        for _, img, im0s, _, frame_idx in tqdm(dataset):
             if frame_idx < 870:
                 continue
             img = torch.from_numpy(img).to(device)
@@ -62,15 +63,14 @@ def run(
             
             results = model(img)[0]
             results = utils.non_max_suppression(results)
-            #if(results[0].shape[0]==0):
-            #    continue
-
-            print(results)
-            if(results.xywh[0].shape[0] == 0):
+            if(results[0].shape[0]==0):
                 continue
-            xywh_boxes = results.xywh[0][:,:-2]
+
+            
+            xyxy = results[0][:,:-2]
+            xywh_boxes = (utils.xyxy2xywh(torch.tensor(xyxy).view(1, 4))).view(-1)
             tlwh_boxes = utils.xywh2tlwh(xywh_boxes)
-            confidence = results.pred[0][:, -2]
+            confidence = results[0][:, -2]
             if use_gpu:
                 tlwh_boxes = tlwh_boxes.cpu()
             features = encoder(bgr_image, tlwh_boxes)
@@ -87,16 +87,17 @@ def run(
                 if not track.is_confirmed() or track.time_since_update > 1:
                     continue
 
-
-            '''
-            bbox = track.to_tlbr()
-            center_x = (bbox[0] + bbox[2]) / 2
-            center_y = (bbox[1] + bbox[3]) / 2
-            cv2.rectangle(bgr_image, (int(bbox[0]), int(bbox[1])), (int(bbox[2]), int(bbox[3])), (255, 255, 255), 2)
-            cv2.putText(bgr_image, "ID: " + str(track.track_id), (int(center_x), int(center_y)), 0,
-                                1e-3 * bgr_image.shape[0], (0, 255, 0), 1)
-            '''
-
+            if save_img:
+                image_path = dir_path / Path(str(frame_idx) + ".jpg")
+            
+                bbox = track.to_tlbr()
+                center_x = (bbox[0] + bbox[2]) / 2
+                center_y = (bbox[1] + bbox[3]) / 2
+                cv2.rectangle(bgr_image, (int(bbox[0]), int(bbox[1])), (int(bbox[2]), int(bbox[3])), (255, 255, 255), 2)
+                cv2.putText(bgr_image, "ID: " + str(track.track_id), (int(center_x), int(center_y)), 0,
+                                    1e-3 * bgr_image.shape[0], (0, 255, 0), 1)
+                
+                cv2.imwrite(str(image_path), bgr_image)
 
             frame_res.append(track.track_id)
             ppl_count += 1
@@ -125,6 +126,7 @@ def parse_opt():
     parser.add_argument('--iou-thres', type=float, default=0.45, help='NMS IoU threshold')
     parser.add_argument('--device', default='cpu', help='cuda device, i.e. 0 or 0,1,2,3 or cpu')
     parser.add_argument('--half', action='store_true', help='use FP16 half-precision inference, supported on CUDA only')
+    parser.add_argument('--save_img', default=False, help='save detection output as image')
     opt = parser.parse_args()
     return opt
 
