@@ -60,9 +60,6 @@ def min_cost_matching(
 
     matches, unmatched_tracks, unmatched_detections = [], [], []
     for col, detection_idx in enumerate(detection_indices):
-        print(col)
-        print(indices)
-        print(indices[:, 1])
         if col not in indices[:, 1]:
             unmatched_detections.append(detection_idx)
     for row, track_idx in enumerate(track_indices):
