@@ -1,8 +1,8 @@
 #@title linear_assignment
 
 import numpy as np
-from scipy.optimize import linear_sum_assignment as linear_assignment
-# from sklearn.utils.linear_assignment_ import linear_assignment
+#from scipy.optimize import linear_sum_assignment as linear_assignment
+from sklearn.utils.linear_assignment_ import linear_assignment
 from . import kalman_filter
 
 
@@ -62,6 +62,7 @@ def min_cost_matching(
     for col, detection_idx in enumerate(detection_indices):
         print(col)
         print(indices)
+        print(indices[:, 1])
         if col not in indices[:, 1]:
             unmatched_detections.append(detection_idx)
     for row, track_idx in enumerate(track_indices):

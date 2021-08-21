@@ -88,20 +88,20 @@ def run(
                 if not track.is_confirmed() or track.time_since_update > 1:
                     continue
 
-            if save_img:
-                image_path = dir_path / Path(str(frame_idx) + ".jpg")
-            
-                bbox = track.to_tlbr()
-                center_x = (bbox[0] + bbox[2]) / 2
-                center_y = (bbox[1] + bbox[3]) / 2
-                cv2.rectangle(bgr_image, (int(bbox[0]), int(bbox[1])), (int(bbox[2]), int(bbox[3])), (255, 255, 255), 2)
-                cv2.putText(bgr_image, "ID: " + str(track.track_id), (int(center_x), int(center_y)), 0,
-                                    1e-3 * bgr_image.shape[0], (0, 255, 0), 1)
+                if save_img:
+                    image_path = dir_path / Path(str(frame_idx) + ".jpg")
                 
-                cv2.imwrite(str(image_path), bgr_image)
+                    bbox = track.to_tlbr()
+                    center_x = (bbox[0] + bbox[2]) / 2
+                    center_y = (bbox[1] + bbox[3]) / 2
+                    cv2.rectangle(bgr_image, (int(bbox[0]), int(bbox[1])), (int(bbox[2]), int(bbox[3])), (255, 255, 255), 2)
+                    cv2.putText(bgr_image, "ID: " + str(track.track_id), (int(center_x), int(center_y)), 0,
+                                        1e-3 * bgr_image.shape[0], (0, 255, 0), 1)
+                    
+                    cv2.imwrite(str(image_path), bgr_image)
 
-            frame_res.append(track.track_id)
-            ppl_count += 1
+                frame_res.append(track.track_id)
+                ppl_count += 1
             
             if ppl_count > 0:
                 '''
