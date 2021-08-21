@@ -50,8 +50,11 @@ def run(
     p = Path(output_dir) / file_path
     with p.open('a') as f:
         for _, img, im0s, _, frame_idx in tqdm(dataset):
+            '''
+            # debug statemnt
             if frame_idx < 870:
                 continue
+            '''
             img = torch.from_numpy(img).to(device)
             img = img.half() if half else img.float()  # uint8 to fp16/32
             img /= 255.0  # 0 - 255 to 0.0 - 1.0
