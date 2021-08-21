@@ -69,12 +69,12 @@ def run(
             
             xyxy = results[0][:,:-2]
             xywh_boxes = utils.xyxy2xywh(xyxy)
-            print(xywh_boxes)
             tlwh_boxes = utils.xywh2tlwh(xywh_boxes)
             confidence = results[0][:, -2]
             if use_gpu:
                 tlwh_boxes = tlwh_boxes.cpu()
             features = encoder(bgr_image, tlwh_boxes)
+            
             detections = [detection.Detection(bbox, confidence, 'person', feature) for bbox, confidence, feature in zip(tlwh_boxes, confidence, features)]
 
             # Call the tracker
