@@ -71,11 +71,12 @@ def run(
             if(results[0].shape[0]==0):
                 continue
 
-            
-            xyxy = results[0][:,:-2]
+            det = results[0]
+            det[:, :4] = utils.scale_coords(img.shape[2:], det[:, :4], im0s.shape).round()
+            xyxy = det[:,:-2]
             xywh_boxes = utils.xyxy2xywh(xyxy)
             tlwh_boxes = utils.xywh2tlwh(xywh_boxes)
-            confidence = results[0][:, -2]
+            confidence = det[:, -2]
             if use_gpu:
                 tlwh_boxes = tlwh_boxes.cpu()
             features = encoder(bgr_image, tlwh_boxes)
