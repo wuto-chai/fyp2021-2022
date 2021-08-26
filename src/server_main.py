@@ -26,16 +26,17 @@ def run(
     save_img=False,
 ):
 
+    
+    device = utils.select_device(device)
+    half &= device.type != 'cpu'  # half precision only supported on CUDA
+
     model = attempt_load(weights, map_location=device)  # load FP32 model
     stride = int(model.stride.max())  # model stride
     model.conf = conf_thres
     model.iou = iou_thres
-    
-    device = utils.select_device(device)
-    half &= device.type != 'cpu'  # half precision only supported on CUDA
     if half:
         model.half()
-
+    
     encoder = create_box_encoder('mars-small128.pb', batch_size=32)
     max_cosine_distance = 0.2
     nn_budget = None
