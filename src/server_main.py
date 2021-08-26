@@ -28,6 +28,7 @@ def run(
 
     
     device = utils.select_device(device)
+    print(device)
     half &= device.type != 'cpu'  # half precision only supported on CUDA
 
     model = attempt_load(weights, map_location=device)  # load FP32 model
@@ -132,7 +133,7 @@ def parse_opt():
     parser.add_argument('--iou-thres', type=float, default=0.45, help='NMS IoU threshold')
     parser.add_argument('--device', default='cpu', help='cuda device, i.e. 0 or 0,1,2,3 or cpu')
     parser.add_argument('--half', action='store_true', help='use FP16 half-precision inference, supported on CUDA only')
-    parser.add_argument('--save_img', default=False, help='save detection output as image')
+    parser.add_argument('--save_img', action='store_true', help='save detection output as image')
     opt = parser.parse_args()
     return opt
 
