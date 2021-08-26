@@ -22,6 +22,7 @@ def run(
     device='cpu',  # cuda device, i.e. 0 or 0,1,2,3 or cpu
     conf_thres=0.5,  # confidence threshold
     iou_thres=0.45,  # NMS IOU threshold
+    debug=False, # debug mode
     half=False,  # use FP16 half-precision inference
     save_img=False,
 ):
@@ -52,11 +53,10 @@ def run(
     p = Path(output_dir) / file_path
     with p.open('a') as f:
         for _, img, im0s, _, frame_idx in tqdm(dataset):
-            '''
-            # debug statemnt
-            if frame_idx < 870:
-                continue
-            '''
+            if debug:
+                if frame_idx > 2000:
+                    break
+            
             img = torch.from_numpy(img).to(device)
             img = img.half() if half else img.float()  # uint8 to fp16/32
             img /= 255.0  # 0 - 255 to 0.0 - 1.0
@@ -133,6 +133,7 @@ def parse_opt():
     parser.add_argument('--conf-thres', type=float, default=0.25, help='confidence threshold')
     parser.add_argument('--iou-thres', type=float, default=0.45, help='NMS IoU threshold')
     parser.add_argument('--device', default='cpu', help='cuda device, i.e. 0 or 0,1,2,3 or cpu')
+    parser.add_argument('--debug', action='store_true', help='debug mode')
     parser.add_argument('--half', action='store_true', help='use FP16 half-precision inference, supported on CUDA only')
     parser.add_argument('--save_img', action='store_true', help='save detection output as image')
     opt = parser.parse_args()
