@@ -22,6 +22,7 @@ def run(
     device='cpu',  # cuda device, i.e. 0 or 0,1,2,3 or cpu
     conf_thres=0.5,  # confidence threshold
     iou_thres=0.45,  # NMS IOU threshold
+    line=((0, 300), (1000, 200)), # boundary crossing line
     debug=False, # debug mode
     half=False,  # use FP16 half-precision inference
     save_img=False,
@@ -29,6 +30,7 @@ def run(
 
     
     device = utils.select_device(device)
+    use_gpu = device == torch.devie('cude:0')
     print(device)
     half &= device.type != 'cpu'  # half precision only supported on CUDA
 
@@ -42,13 +44,17 @@ def run(
     encoder = create_box_encoder('mars-small128.pb', batch_size=32)
     max_cosine_distance = 0.2
     nn_budget = None
-    use_gpu = True
+    
     metric = nn_matching.NearestNeighborDistanceMetric("cosine", max_cosine_distance, nn_budget)
     tracker = Tracker(metric)
     dataset = LoadImages(source, img_size=640, stride=stride)
+
+    out_counter = 0 # below -> above
+    in_counter = 0 # above -> below
+    memory = {}
+
     dir_path = Path(output_dir)
     file_path = Path('output.txt')
-
     dir_path.mkdir(exist_ok=True)
     p = Path(output_dir) / file_path
     with p.open('a') as f:
@@ -57,6 +63,11 @@ def run(
                 if frame_idx > 2000:
                     break
             
+            indexIDs = []
+            boxes = []
+            previous = memory.copy() # last frame we have these ppl boxes
+            memory = {}
+
             img = torch.from_numpy(img).to(device)
             img = img.half() if half else img.float()  # uint8 to fp16/32
             img /= 255.0  # 0 - 255 to 0.0 - 1.0
@@ -89,53 +100,71 @@ def run(
 
 
             ppl_count = 0   
-            frame_res = []
             for track in tracker.tracks:
                 if not track.is_confirmed() or track.time_since_update > 1:
                     continue
 
+                bbox = track.to_tlbr()
+                boxes.append([bbox[0], bbox[1], bbox[2], bbox[3]])
+                indexIDs.append(track.track_id) # # this frame we have these ppl idxs
+                memory[track.track_id] = [bbox[0], bbox[1], bbox[2], bbox[3]]  # this frame we have these ppl boxes
+                ppl_count += 1
                 if save_img:
-                    image_path = dir_path / Path(str(frame_idx) + ".jpg")
-                
-                    bbox = track.to_tlbr()
-                    center_x = (bbox[0] + bbox[2]) / 2
-                    center_y = (bbox[1] + bbox[3]) / 2
+                    center_x = int((bbox[0] + bbox[2]) / 2)
+                    center_y = int((bbox[1] + bbox[3]) / 2)
                     cv2.rectangle(bgr_image, (int(bbox[0]), int(bbox[1])), (int(bbox[2]), int(bbox[3])), (255, 255, 255), 2)
                     cv2.putText(bgr_image, "ID: " + str(track.track_id), (int(center_x), int(center_y)), 0,
                                         1e-3 * bgr_image.shape[0], (0, 255, 0), 1)
-                    
-                    cv2.imwrite(str(image_path), bgr_image)
 
-                frame_res.append(track.track_id)
-                ppl_count += 1
-            
+
             if ppl_count > 0:
-                '''
-                print(frame_idx)
-                cv2_imshow(bgr_image)
-                '''
+                for i, box in enumerate(boxes):
+                    if indexIDs[i] in previous:
+                        center_x = int((box[0] + box[2]) / 2)
+                        center_y = int((box[1] + box[3]) / 2)
+                        p0 = (center_x, center_y)
+                        previous_box = previous[indexIDs[i]]
+                        center_x2 = int((previous_box[0] + previous_box[2]) / 2)
+                        center_y2 = int((previous_box[1] + previous_box[3]) / 2)
+                        p1 = (center_x2, center_y2)
+
+                        # cv2.line(bgr_image, p0, p1, (0, 255, 0), 3)
+
+                        if utils.intersect(p0, p1, line[0], line[1]):
+                            if utils.below_line(line, p0): 
+                                out_counter += 1
+                            else: 
+                                in_counter += 1
+
                 f.write(str(frame_idx))
                 f.write(",")
                 f.write(str(datetime.timedelta(seconds=frame_idx//25)))
                 f.write(",")
                 f.write(str(ppl_count))
-                for trackid in frame_res:
-                    f.write(",")
+                for trackid in indexIDs:
+                    f.write(" ")
                     f.write(str(trackid))
                 f.write("\n")
-
+                if save_img:
+                    image_path = dir_path / Path(str(frame_idx) + ".jpg")
+                    cv2.line(bgr_image, line[0], line[1], (0, 255, 255), 2)  # 画出计数线
+                    cv2.putText(bgr_image, "In: {}".format(str(in_counter)), (300, 50),
+                        cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 255, 255), 2)
+                    cv2.putText(bgr_image, "Out: {}".format(str(out_counter)), (400, 50),
+                    cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 255, 255), 2)
+                    cv2.imwrite(str(image_path), bgr_image)
 
 def parse_opt():
     parser = argparse.ArgumentParser()
     parser.add_argument('--weights', nargs='+', type=str, default='yolov5s.pt', help='model.pt path(s)')
     parser.add_argument('--source', type=str, default='data/images', help='file/dir/URL/glob, 0 for webcam')
-    parser.add_argument('--output_dir', type=str, default='out', help='dir for ouput files')
+    parser.add_argument('--output-dir', type=str, default='out', help='dir for ouput files')
     parser.add_argument('--conf-thres', type=float, default=0.25, help='confidence threshold')
     parser.add_argument('--iou-thres', type=float, default=0.45, help='NMS IoU threshold')
     parser.add_argument('--device', default='cpu', help='cuda device, i.e. 0 or 0,1,2,3 or cpu')
     parser.add_argument('--debug', action='store_true', help='debug mode')
     parser.add_argument('--half', action='store_true', help='use FP16 half-precision inference, supported on CUDA only')
-    parser.add_argument('--save_img', action='store_true', help='save detection output as image')
+    parser.add_argument('--save-img', action='store_true', help='save detection output as image')
     opt = parser.parse_args()
     return opt
 
