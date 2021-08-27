@@ -30,7 +30,7 @@ def run(
 
     
     device = utils.select_device(device)
-    use_gpu = device == torch.devie('cude:0')
+    use_gpu = device == torch.device('cuda:0')
     print(device)
     half &= device.type != 'cpu'  # half precision only supported on CUDA
 
