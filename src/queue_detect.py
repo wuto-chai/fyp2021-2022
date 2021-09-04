@@ -24,7 +24,7 @@ def run(
     iou_thres=0.45,  # NMS IOU threshold
     line=((0, 300), (1000, 200)), # boundary crossing line
     queue_box=((526,215),(1106,929)),   # xyxy
-    debug=False, # debug mode
+    debug_frames=0, # debug mode
     half=False,  # use FP16 half-precision inference
     save_img=False,
 ):
@@ -60,8 +60,8 @@ def run(
     p = Path(output_dir) / file_path
     with p.open('a') as f:
         for _, img, im0s, _, frame_idx in tqdm(dataset):
-            if debug:
-                if frame_idx > 2000:
+            if debug_frames > 0:
+                if frame_idx > debug_frames:
                     break
             
             indexIDs = []
@@ -170,9 +170,9 @@ def parse_opt():
     parser.add_argument('--conf-thres', type=float, default=0.25, help='confidence threshold')
     parser.add_argument('--iou-thres', type=float, default=0.45, help='NMS IoU threshold')
     parser.add_argument('--line', default = ((0, 2300), (1000, 200)), help='boundary crossing line')
-    parser.add_argument('--queue_box', default = ((526,215),(1106,929)), help='queue area')
+    parser.add_argument('--queue-box', default = ((526,215),(1106,929)), help='queue area')
     parser.add_argument('--device', default='cpu', help='cuda device, i.e. 0 or 0,1,2,3 or cpu')
-    parser.add_argument('--debug', action='store_true', help='debug mode')
+    parser.add_argument('--debug-frames', default=0, help='debug mode, run till frame number x')
     parser.add_argument('--half', action='store_true', help='use FP16 half-precision inference, supported on CUDA only')
     parser.add_argument('--save-img', action='store_true', help='save detection output as image')
     opt = parser.parse_args()
