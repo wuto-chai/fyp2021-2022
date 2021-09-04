@@ -22,14 +22,16 @@ def run(
     device='cpu',  # cuda device, i.e. 0 or 0,1,2,3 or cpu
     conf_thres=0.5,  # confidence threshold
     iou_thres=0.45,  # NMS IOU threshold
-    line=((0, 300), (1000, 200)), # boundary crossing line
-    queue_box=((526,215),(1106,929)),   # xyxy
+    line=[0, 300, 1000, 200], # boundary crossing line
+    queue_box=[526,215,1106,929],   # xyxy
     debug_frames=0, # debug mode
     half=False,  # use FP16 half-precision inference
     save_img=False,
+    save_video=False,
 ):
 
-    
+    line = ((line[0], line[1]),(line[2], line[3]))
+    queue_box = ((queue_box[0], queue_box[1]),(queue_box[2], queue_box[3]))
     device = utils.select_device(device)
     use_gpu = device == torch.device('cuda:0')
     print(device)
@@ -59,6 +61,13 @@ def run(
     dir_path.mkdir(exist_ok=True)
     p = Path(output_dir) / file_path
     with p.open('a') as f:
+        if save_video:
+            for _, img, im0s, _, frame_idx in dataset:
+                height, width, _ = im0s.shape
+                break
+            size = (width, height)
+            fourcc = cv2.VideoWriter_fourcc('m', 'p', '4', 'v')
+            video_writer = cv2.VideoWriter(str(dir_path / Path("out.mp4")), fourcc, 60, size)
         for _, img, im0s, _, frame_idx in tqdm(dataset):
             if debug_frames > 0:
                 if frame_idx > debug_frames:
@@ -85,7 +94,8 @@ def run(
 
             det = results[0]
             det[:, :4] = utils.scale_coords(img.shape[2:], det[:, :4], im0s.shape).round()
-            xyxy = det[:,:-2]
+            person_ind = [i for i, cls in enumerate(det[:, -1]) if int(cls) == 0]   
+            xyxy = det[person_ind, :-2]  # find person only
             xywh_boxes = utils.xyxy2xywh(xyxy)
             tlwh_boxes = utils.xywh2tlwh(xywh_boxes)
             confidence = det[:, -2]
@@ -101,7 +111,7 @@ def run(
 
 
             ppl_count = 0   
-            queue_count = 0
+            queue_list = []
             for track in tracker.tracks:
                 if not track.is_confirmed() or track.time_since_update > 1:
                     continue
@@ -114,11 +124,12 @@ def run(
                 center_x = int((bbox[0] + bbox[2]) / 2)
                 center_y = int((bbox[1] + bbox[3]) / 2)
                 if utils.in_box((center_x, center_y), queue_box):
-                    queue_count += 1
-                if save_img:
-                    cv2.rectangle(bgr_image, (int(bbox[0]), int(bbox[1])), (int(bbox[2]), int(bbox[3])), (255, 255, 255), 2)
-                    cv2.putText(bgr_image, "ID: " + str(track.track_id), (int(center_x), int(center_y)), 0,
-                                        1e-3 * bgr_image.shape[0], (0, 255, 0), 1)
+                    queue_list.append(track.track_id)
+                    if save_img or save_video:
+                        cv2.rectangle(bgr_image, (int(bbox[0]), int(bbox[1])), (int(bbox[2]), int(bbox[3])), (255, 255, 255), 2)
+                        cv2.rectangle(bgr_image, (int(queue_box[0][0]), int(queue_box[0][1])), (int(queue_box[1][0]), int(queue_box[1][1])), (255, 0, 0), 2)
+                        cv2.putText(bgr_image, "ID: " + str(track.track_id), (int(center_x), int(center_y)), 0,
+                                            1e-3 * bgr_image.shape[0], (0, 255, 0), 1)
 
 
             if ppl_count > 0:
@@ -151,16 +162,18 @@ def run(
                     f.write(" ")
                     f.write(str(trackid))
                 f.write("\n")
+                if save_img or save_video:                        
+                    image_path = dir_path / Path('{:06}.jpg'.format(frame_idx) + ".jpg")
+                    cv2.putText(bgr_image, "Queue Lenth: {}".format(str(len(queue_list))), (100, 100),
+                        cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 255, 255), 2)
+                    cv2.putText(bgr_image, "Queue: {}".format(str(queue_list)[1:-1]), (100, 50),
+                        cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 255, 255), 2)
+                if save_video:
+                      video_writer.write(bgr_image)
                 if save_img:
-                    image_path = dir_path / Path(str(frame_idx) + ".jpg")
-                    cv2.line(bgr_image, line[0], line[1], (0, 255, 255), 2)  # 画出计数线
-                    cv2.putText(bgr_image, "In: {}".format(str(in_counter)), (300, 50),
-                        cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 255, 255), 2)
-                    cv2.putText(bgr_image, "Out: {}".format(str(out_counter)), (400, 50),
-                        cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 255, 255), 2)
-                    cv2.putText(bgr_image, "Queue: {}".format(str(queue_count)), (300, 100),
-                        cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 255, 255), 2)
                     cv2.imwrite(str(image_path), bgr_image)
+        if save_video:
+            video_writer.release()
 
 def parse_opt():
     parser = argparse.ArgumentParser()
@@ -169,12 +182,13 @@ def parse_opt():
     parser.add_argument('--output-dir', type=str, default='out', help='dir for ouput files')
     parser.add_argument('--conf-thres', type=float, default=0.25, help='confidence threshold')
     parser.add_argument('--iou-thres', type=float, default=0.45, help='NMS IoU threshold')
-    parser.add_argument('--line', default = ((0, 2300), (1000, 200)), help='boundary crossing line')
-    parser.add_argument('--queue-box', default = ((526,215),(1106,929)), help='queue area')
+    parser.add_argument('--line', nargs='+', type=int, default=[0, 300, 1000, 200], help='boundary crossing line')
+    parser.add_argument('--queue-box', nargs='+', type=int, default=[526,215,1106,929], help='queue area')
     parser.add_argument('--device', default='cpu', help='cuda device, i.e. 0 or 0,1,2,3 or cpu')
-    parser.add_argument('--debug-frames', default=0, help='debug mode, run till frame number x')
+    parser.add_argument('--debug-frames', type=int, default=0, help='debug mode, run till frame number x')
     parser.add_argument('--half', action='store_true', help='use FP16 half-precision inference, supported on CUDA only')
-    parser.add_argument('--save-img', action='store_true', help='save detection output as image')
+    parser.add_argument('--save-img', action='store_true', help='save detection output as images')
+    parser.add_argument('--save-video', action='store_true', help='save detection output as an video')
     opt = parser.parse_args()
     return opt
 
