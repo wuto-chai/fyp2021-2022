@@ -142,6 +142,9 @@ def run(
                 f.write(",")
                 f.write(str(ppl_count))
                 f.write(",")
+                f.write(str(in_counter + out_counter)) # accumulated flux
+                f.write(",")
+
                 for trackid in indexIDs:
                     f.write(" ")
                     f.write(str(trackid))
