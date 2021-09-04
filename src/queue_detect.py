@@ -1,10 +1,13 @@
 import argparse
 
 from pathlib import Path
+import numpy as np
 import cv2
 import datetime
 from tqdm import tqdm
 import torch
+from shapely.geometry import Polygon
+from shapely.geometry import Point
 
 from deep_sort.tracker import Tracker
 from deep_sort import nn_matching
@@ -15,6 +18,7 @@ from my_utils import utils
 from deep_sort import detection
 
 
+
 def run(
     weights='yolov5l.pt',  # model.pt path(s)
     source='frames',  # file/dir/URL/glob, 0 for webcam
@@ -23,7 +27,7 @@ def run(
     conf_thres=0.5,  # confidence threshold
     iou_thres=0.45,  # NMS IOU threshold
     line=[0, 300, 1000, 200], # boundary crossing line
-    queue_box=[526,215,1106,929],   # xyxy
+    queue_polygon=[526,215,1106,929],   # x y x y x y x y x y
     debug_frames=0, # debug mode
     half=False,  # use FP16 half-precision inference
     save_img=False,
@@ -31,7 +35,10 @@ def run(
 ):
 
     line = ((line[0], line[1]),(line[2], line[3]))
-    queue_box = ((queue_box[0], queue_box[1]),(queue_box[2], queue_box[3]))
+    vertices = []
+    for x, y in zip(*[iter(queue_polygon)]*2):   # loop 2 coords at a time
+        vertices.append((x,y))
+    queue_polygon = Polygon(vertices)
     device = utils.select_device(device)
     use_gpu = device == torch.device('cuda:0')
     print(device)
@@ -123,11 +130,13 @@ def run(
                 ppl_count += 1
                 center_x = int((bbox[0] + bbox[2]) / 2)
                 center_y = int((bbox[1] + bbox[3]) / 2)
-                if utils.in_box((center_x, center_y), queue_box):
+                if queue_polygon.intersects(Point(center_x, center_y)):
                     queue_list.append(track.track_id)
                     if save_img or save_video:
                         cv2.rectangle(bgr_image, (int(bbox[0]), int(bbox[1])), (int(bbox[2]), int(bbox[3])), (255, 255, 255), 2)
-                        cv2.rectangle(bgr_image, (int(queue_box[0][0]), int(queue_box[0][1])), (int(queue_box[1][0]), int(queue_box[1][1])), (255, 0, 0), 2)
+                        pts=np.array(vertices,np.int32)
+                        pts = pts.reshape((-1,1,2))
+                        cv2.polylines(bgr_image,[pts],True,(255,0,0), 2) 
                         cv2.putText(bgr_image, "ID: " + str(track.track_id), (int(center_x), int(center_y)), 0,
                                             1e-3 * bgr_image.shape[0], (0, 255, 0), 1)
 
@@ -158,6 +167,7 @@ def run(
                 f.write(str(ppl_count))
                 f.write(",")
                 f.write(str(in_counter + out_counter)) # accumulated flux
+                f.write(",")
                 for trackid in indexIDs:
                     f.write(" ")
                     f.write(str(trackid))
@@ -183,7 +193,7 @@ def parse_opt():
     parser.add_argument('--conf-thres', type=float, default=0.25, help='confidence threshold')
     parser.add_argument('--iou-thres', type=float, default=0.45, help='NMS IoU threshold')
     parser.add_argument('--line', nargs='+', type=int, default=[0, 300, 1000, 200], help='boundary crossing line')
-    parser.add_argument('--queue-box', nargs='+', type=int, default=[526,215,1106,929], help='queue area')
+    parser.add_argument('--queue-polygon', nargs='+', type=int, default=[526,215,1106,929], help='queue area')
     parser.add_argument('--device', default='cpu', help='cuda device, i.e. 0 or 0,1,2,3 or cpu')
     parser.add_argument('--debug-frames', type=int, default=0, help='debug mode, run till frame number x')
     parser.add_argument('--half', action='store_true', help='use FP16 half-precision inference, supported on CUDA only')

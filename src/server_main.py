@@ -141,6 +141,7 @@ def run(
                 f.write(str(datetime.timedelta(seconds=frame_idx//25)))
                 f.write(",")
                 f.write(str(ppl_count))
+                f.write(",")
                 for trackid in indexIDs:
                     f.write(" ")
                     f.write(str(trackid))
