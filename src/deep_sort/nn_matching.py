@@ -1,4 +1,5 @@
 #@title nn.matching
+import numpy as np
 def _pdist(a, b):
     """Compute pair-wise squared distance between points in `a` and `b`.
 
