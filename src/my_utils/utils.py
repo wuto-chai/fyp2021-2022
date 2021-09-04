@@ -231,3 +231,6 @@ def below_line(line, point): # direction from line[0] to line[1]
     slope = (line[1][1] - line[0][1]) / (line[1][0] - line[0][0])
     intercept = line[1][1] - slope * line[1][0]
     return point[1] < point[0] * slope + intercept
+
+def in_box(point, box):
+    return point[0] > box[0][0] and point[0] < box[1][0] and point[1] > box[0][1] and point[1] < box[1][1]

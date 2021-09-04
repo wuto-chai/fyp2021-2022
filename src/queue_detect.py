@@ -16,13 +16,14 @@ from deep_sort import detection
 
 
 def run(
-    weights='yolov5l_best.pt',  # model.pt path(s)
+    weights='yolov5l.pt',  # model.pt path(s)
     source='frames',  # file/dir/URL/glob, 0 for webcam
     output_dir='out', 
     device='cpu',  # cuda device, i.e. 0 or 0,1,2,3 or cpu
     conf_thres=0.5,  # confidence threshold
     iou_thres=0.45,  # NMS IOU threshold
     line=((0, 300), (1000, 200)), # boundary crossing line
+    queue_box=((526,215),(1106,929)),   # xyxy
     debug=False, # debug mode
     half=False,  # use FP16 half-precision inference
     save_img=False,
@@ -100,6 +101,7 @@ def run(
 
 
             ppl_count = 0   
+            queue_count = 0
             for track in tracker.tracks:
                 if not track.is_confirmed() or track.time_since_update > 1:
                     continue
@@ -109,9 +111,11 @@ def run(
                 indexIDs.append(track.track_id) # # this frame we have these ppl idxs
                 memory[track.track_id] = [bbox[0], bbox[1], bbox[2], bbox[3]]  # this frame we have these ppl boxes
                 ppl_count += 1
+                center_x = int((bbox[0] + bbox[2]) / 2)
+                center_y = int((bbox[1] + bbox[3]) / 2)
+                if utils.in_box((center_x, center_y), queue_box):
+                    queue_count += 1
                 if save_img:
-                    center_x = int((bbox[0] + bbox[2]) / 2)
-                    center_y = int((bbox[1] + bbox[3]) / 2)
                     cv2.rectangle(bgr_image, (int(bbox[0]), int(bbox[1])), (int(bbox[2]), int(bbox[3])), (255, 255, 255), 2)
                     cv2.putText(bgr_image, "ID: " + str(track.track_id), (int(center_x), int(center_y)), 0,
                                         1e-3 * bgr_image.shape[0], (0, 255, 0), 1)
@@ -141,6 +145,8 @@ def run(
                 f.write(str(datetime.timedelta(seconds=frame_idx//25)))
                 f.write(",")
                 f.write(str(ppl_count))
+                f.write(",")
+                f.write(str(in_counter + out_counter)) # accumulated flux
                 for trackid in indexIDs:
                     f.write(" ")
                     f.write(str(trackid))
@@ -151,7 +157,9 @@ def run(
                     cv2.putText(bgr_image, "In: {}".format(str(in_counter)), (300, 50),
                         cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 255, 255), 2)
                     cv2.putText(bgr_image, "Out: {}".format(str(out_counter)), (400, 50),
-                    cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 255, 255), 2)
+                        cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 255, 255), 2)
+                    cv2.putText(bgr_image, "Queue: {}".format(str(queue_count)), (300, 100),
+                        cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 255, 255), 2)
                     cv2.imwrite(str(image_path), bgr_image)
 
 def parse_opt():
@@ -162,6 +170,7 @@ def parse_opt():
     parser.add_argument('--conf-thres', type=float, default=0.25, help='confidence threshold')
     parser.add_argument('--iou-thres', type=float, default=0.45, help='NMS IoU threshold')
     parser.add_argument('--line', default = ((0, 2300), (1000, 200)), help='boundary crossing line')
+    parser.add_argument('--queue_box', default = ((526,215),(1106,929)), help='queue area')
     parser.add_argument('--device', default='cpu', help='cuda device, i.e. 0 or 0,1,2,3 or cpu')
     parser.add_argument('--debug', action='store_true', help='debug mode')
     parser.add_argument('--half', action='store_true', help='use FP16 half-precision inference, supported on CUDA only')
