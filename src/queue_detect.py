@@ -28,6 +28,7 @@ def run(
     iou_thres=0.45,  # NMS IOU threshold
     line=[0, 300, 1000, 200], # boundary crossing line
     queue_polygon=[526,215,1106,929],   # x y x y x y x y x y
+    displacement_thres=10, # count stationary person only
     debug_frames=0, # debug mode
     half=False,  # use FP16 half-precision inference
     save_img=False,
@@ -46,8 +47,6 @@ def run(
 
     model = attempt_load(weights, map_location=device)  # load FP32 model
     stride = int(model.stride.max())  # model stride
-    model.conf = conf_thres
-    model.iou = iou_thres
     if half:
         model.half()
     
@@ -59,131 +58,110 @@ def run(
     tracker = Tracker(metric)
     dataset = LoadImages(source, img_size=640, stride=stride)
 
-    out_counter = 0 # below -> above
-    in_counter = 0 # above -> below
     memory = {}
 
     dir_path = Path(output_dir)
     file_path = Path('output.txt')
     dir_path.mkdir(exist_ok=True)
     p = Path(output_dir) / file_path
-    with p.open('a') as f:
-        if save_video:
-            for _, img, im0s, _, frame_idx in dataset:
-                height, width, _ = im0s.shape
-                break
-            size = (width, height)
-            fourcc = cv2.VideoWriter_fourcc('m', 'p', '4', 'v')
-            video_writer = cv2.VideoWriter(str(dir_path / Path("out.mp4")), fourcc, 60, size)
-        for _, img, im0s, _, frame_idx in tqdm(dataset):
-            if debug_frames > 0:
-                if frame_idx > debug_frames:
-                    break
-            
-            indexIDs = []
-            boxes = []
-            previous = memory.copy() # last frame we have these ppl boxes
-            memory = {}
+    if save_video:
+        for _, img, im0s, _, frame_idx in dataset:
+            height, width, _ = im0s.shape
+            break
+        size = (width, height)
+        fourcc = cv2.VideoWriter_fourcc('m', 'p', '4', 'v')
+        video_writer = cv2.VideoWriter(str(dir_path / Path("out.mp4")), fourcc, 60, size)
+    for _, img, im0s, _, frame_idx in tqdm(dataset):
+        if debug_frames > 0 and frame_idx > debug_frames:
+            break
+        
+        indexIDs = []
+        boxes = []
+        previous = memory.copy() # last frame we have these ppl boxes
+        memory = {}
 
-            img = torch.from_numpy(img).to(device)
-            img = img.half() if half else img.float()  # uint8 to fp16/32
-            img /= 255.0  # 0 - 255 to 0.0 - 1.0
-            if img.ndimension() == 3:
-                img = img.unsqueeze(0)
+        img = torch.from_numpy(img).to(device)
+        img = img.half() if half else img.float()  # uint8 to fp16/32
+        img /= 255.0  # 0 - 255 to 0.0 - 1.0
+        if img.ndimension() == 3:
+            img = img.unsqueeze(0)
 
-            bgr_image = im0s
+        bgr_image = im0s
 
-            
-            results = model(img)[0]
-            results = utils.non_max_suppression(results)
-            if(results[0].shape[0]==0):
+        
+        results = model(img)[0]
+        results = utils.non_max_suppression(results, conf_thres, iou_thres)
+        if(results[0].shape[0]==0):
+            continue
+
+        det = results[0]
+        det[:, :4] = utils.scale_coords(img.shape[2:], det[:, :4], im0s.shape).round()
+        person_ind = [i for i, cls in enumerate(det[:, -1]) if int(cls) == 0]   
+        xyxy = det[person_ind, :-2]  # find person only
+        xywh_boxes = utils.xyxy2xywh(xyxy)
+        tlwh_boxes = utils.xywh2tlwh(xywh_boxes)
+        confidence = det[:, -2]
+        if use_gpu:
+            tlwh_boxes = tlwh_boxes.cpu()
+        features = encoder(bgr_image, tlwh_boxes)
+        
+        detections = [detection.Detection(bbox, confidence, 'person', feature) for bbox, confidence, feature in zip(tlwh_boxes, confidence, features)]
+
+        # Call the tracker
+        tracker.predict()
+        tracker.update(detections)
+
+
+        ppl_count = 0   
+        queue_list = []
+        for track in tracker.tracks:
+            if not track.is_confirmed() or track.time_since_update > 1:
                 continue
 
-            det = results[0]
-            det[:, :4] = utils.scale_coords(img.shape[2:], det[:, :4], im0s.shape).round()
-            person_ind = [i for i, cls in enumerate(det[:, -1]) if int(cls) == 0]   
-            xyxy = det[person_ind, :-2]  # find person only
-            xywh_boxes = utils.xyxy2xywh(xyxy)
-            tlwh_boxes = utils.xywh2tlwh(xywh_boxes)
-            confidence = det[:, -2]
-            if use_gpu:
-                tlwh_boxes = tlwh_boxes.cpu()
-            features = encoder(bgr_image, tlwh_boxes)
-            
-            detections = [detection.Detection(bbox, confidence, 'person', feature) for bbox, confidence, feature in zip(tlwh_boxes, confidence, features)]
-
-            # Call the tracker
-            tracker.predict()
-            tracker.update(detections)
+            bbox = track.to_tlbr()
+            boxes.append([bbox[0], bbox[1], bbox[2], bbox[3]])
+            indexIDs.append(track.track_id) # # this frame we have these ppl idxs
+            memory[track.track_id] = [bbox[0], bbox[1], bbox[2], bbox[3]]  # this frame we have these ppl boxes
+            ppl_count += 1
 
 
-            ppl_count = 0   
-            queue_list = []
-            for track in tracker.tracks:
-                if not track.is_confirmed() or track.time_since_update > 1:
-                    continue
-
-                bbox = track.to_tlbr()
-                boxes.append([bbox[0], bbox[1], bbox[2], bbox[3]])
-                indexIDs.append(track.track_id) # # this frame we have these ppl idxs
-                memory[track.track_id] = [bbox[0], bbox[1], bbox[2], bbox[3]]  # this frame we have these ppl boxes
-                ppl_count += 1
-                center_x = int((bbox[0] + bbox[2]) / 2)
-                center_y = int((bbox[1] + bbox[3]) / 2)
-                if queue_polygon.intersects(Point(center_x, center_y)):
-                    queue_list.append(track.track_id)
+        if ppl_count > 0:
+            for i, box in enumerate(boxes):
+                if indexIDs[i] in previous:
+                    track_id = indexIDs[i]
+                    center_x = int((box[0] + box[2]) / 2)
+                    center_y = int((box[1] + box[3]) / 2)
+                    p0 = (center_x, center_y)
+                    previous_box = previous[track_id]
+                    center_x2 = int((previous_box[0] + previous_box[2]) / 2)
+                    center_y2 = int((previous_box[1] + previous_box[3]) / 2)
+                    p1 = (center_x2, center_y2)
+                    displacement = abs(p0[0] - p1[0]) + abs(p0[1] - p1[1])
                     if save_img or save_video:
-                        cv2.rectangle(bgr_image, (int(bbox[0]), int(bbox[1])), (int(bbox[2]), int(bbox[3])), (255, 255, 255), 2)
                         pts=np.array(vertices,np.int32)
                         pts = pts.reshape((-1,1,2))
                         cv2.polylines(bgr_image,[pts],True,(255,0,0), 2) 
-                        cv2.putText(bgr_image, "ID: " + str(track.track_id), (int(center_x), int(center_y)), 0,
-                                            1e-3 * bgr_image.shape[0], (0, 255, 0), 1)
-
-
-            if ppl_count > 0:
-                for i, box in enumerate(boxes):
-                    if indexIDs[i] in previous:
-                        center_x = int((box[0] + box[2]) / 2)
-                        center_y = int((box[1] + box[3]) / 2)
-                        p0 = (center_x, center_y)
-                        previous_box = previous[indexIDs[i]]
-                        center_x2 = int((previous_box[0] + previous_box[2]) / 2)
-                        center_y2 = int((previous_box[1] + previous_box[3]) / 2)
-                        p1 = (center_x2, center_y2)
-
-                        # cv2.line(bgr_image, p0, p1, (0, 255, 0), 3)
-
-                        if utils.intersect(p0, p1, line[0], line[1]):
-                            if utils.below_line(line, p0): 
-                                out_counter += 1
-                            else: 
-                                in_counter += 1
-
-                f.write(str(frame_idx))
-                f.write(",")
-                f.write(str(datetime.timedelta(seconds=frame_idx//25)))
-                f.write(",")
-                f.write(str(ppl_count))
-                f.write(",")
-                f.write(str(in_counter + out_counter)) # accumulated flux
-                f.write(",")
-                for trackid in indexIDs:
-                    f.write(" ")
-                    f.write(str(trackid))
-                f.write("\n")
-                if save_img or save_video:                        
-                    image_path = dir_path / Path('{:06}.jpg'.format(frame_idx) + ".jpg")
-                    cv2.putText(bgr_image, "Queue Lenth: {}".format(str(len(queue_list))), (100, 100),
-                        cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 255, 255), 2)
-                    cv2.putText(bgr_image, "Queue: {}".format(str(queue_list)[1:-1]), (100, 50),
-                        cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 255, 255), 2)
-                if save_video:
-                      video_writer.write(bgr_image)
-                if save_img:
-                    cv2.imwrite(str(image_path), bgr_image)
-        if save_video:
-            video_writer.release()
+                        if debug_frames > 0:
+                            cv2.rectangle(bgr_image, (int(box[0]), int(box[1])), (int(box[2]), int(box[3])), (0, 255, 0), 2)
+                            cv2.putText(bgr_image, str(displacement), (int(center_x), int(box[1])), 0,
+                                        1e-3 * bgr_image.shape[0], (0, 0, 255), 1)
+                        if displacement < displacement_thres and queue_polygon.intersects(Point(center_x, center_y)): 
+                            queue_list.append(track_id)
+                            cv2.rectangle(bgr_image, (int(box[0]), int(box[1])), (int(box[2]), int(box[3])), (255, 255, 255), 4)
+                            cv2.putText(bgr_image, "ID: " + str(track_id), (int(center_x), int(center_y)), 0,
+                                                1e-3 * bgr_image.shape[0], (0, 255, 0), 1)
+            if save_img or save_video:                        
+                cv2.putText(bgr_image, "Queue Lenth: {}".format(str(len(queue_list))), (100, 100),
+                    cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 255, 255), 2)
+                cv2.putText(bgr_image, "Queue: {}".format(str(queue_list)[1:-1]), (100, 50),
+                    cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 255, 255), 2)
+            if save_video:
+                    video_writer.write(bgr_image)
+            if save_img:
+                image_path = dir_path / Path('{:06}.jpg'.format(frame_idx))
+                cv2.imwrite(str(image_path), bgr_image)
+    if save_video:
+        video_writer.release()
 
 def parse_opt():
     parser = argparse.ArgumentParser()
@@ -194,6 +172,7 @@ def parse_opt():
     parser.add_argument('--iou-thres', type=float, default=0.45, help='NMS IoU threshold')
     parser.add_argument('--line', nargs='+', type=int, default=[0, 300, 1000, 200], help='boundary crossing line')
     parser.add_argument('--queue-polygon', nargs='+', type=int, default=[526,215,1106,929], help='queue area')
+    parser.add_argument('--displacement-thres', type=int, default=10, help='not count person with large displacement between frames')
     parser.add_argument('--device', default='cpu', help='cuda device, i.e. 0 or 0,1,2,3 or cpu')
     parser.add_argument('--debug-frames', type=int, default=0, help='debug mode, run till frame number x')
     parser.add_argument('--half', action='store_true', help='use FP16 half-precision inference, supported on CUDA only')
