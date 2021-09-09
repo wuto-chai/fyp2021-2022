@@ -1,6 +1,7 @@
 import argparse
 
 from pathlib import Path
+import copy
 import cv2
 import datetime
 from tqdm import tqdm
@@ -25,8 +26,6 @@ def run(
     line=[0, 300, 1000, 200], # boundary crossing line
     debug_frames=0, # debug mode
     half=False,  # use FP16 half-precision inference
-    save_img=False,
-    save_video=False,
 ):
 
     line = ((line[0], line[1]),(line[2], line[3]))
@@ -51,32 +50,24 @@ def run(
     tracker = Tracker(metric)
     dataset = LoadImages(source, img_size=640, stride=stride)
 
-    out_counter = 0 # below -> above
-    in_counter = 0 # above -> below
-    memory = {}
 
     dir_path = Path(output_dir)
     file_path = Path('output.txt')
     dir_path.mkdir(exist_ok=True)
     p = Path(output_dir) / file_path
     lastFrameRes = []
-    with p.open('a') as f:
-        f.write("start_frame, start_time, end_frame, end_time, num, idxs\n")
-        if save_video:
-            for _, img, im0s, _, frame_idx in dataset:
-                height, width, _ = im0s.shape
-                break
-            size = (width, height)
-            fourcc = cv2.VideoWriter_fourcc('m', 'p', '4', 'v')
-            video_writer = cv2.VideoWriter(str(dir_path / Path("out.mp4")), fourcc, 60, size)
+    thisFrameRes = []
+    with p.open('w') as f:
+        f.write("start_frame,start_time,end_frame,end_time,num,idx\n")
         for _, img, im0s, _, frame_idx in tqdm(dataset):
+            if frame_idx < 2900:
+              continue
             if debug_frames > 0 and frame_idx > debug_frames:
                 break
             
             indexIDs = []
             boxes = []
-            previous = memory.copy() # last frame we have these ppl boxes
-            memory = {}
+            ppl_count = 0
 
             img = torch.from_numpy(img).to(device)
             img = img.half() if half else img.float()  # uint8 to fp16/32
@@ -89,66 +80,40 @@ def run(
             
             results = model(img)[0]
             results = utils.non_max_suppression(results)
-            if(results[0].shape[0]==0):
-                continue
+            if results[0].shape[0] > 0:
+                det = results[0]
+                det[:, :4] = utils.scale_coords(img.shape[2:], det[:, :4], im0s.shape).round()
+                person_ind = [i for i, cls in enumerate(det[:, -1]) if int(cls) == 0]   
+                xyxy = det[person_ind, :-2]  # find person only
+                # xyxy = det[:,:-2]
+                xywh_boxes = utils.xyxy2xywh(xyxy)
+                tlwh_boxes = utils.xywh2tlwh(xywh_boxes)
+                confidence = det[:, -2]
+                if use_gpu:
+                    tlwh_boxes = tlwh_boxes.cpu()
+                features = encoder(bgr_image, tlwh_boxes)
+                
+                detections = [detection.Detection(bbox, confidence, 'person', feature) for bbox, confidence, feature in zip(tlwh_boxes, confidence, features)]
 
-            det = results[0]
-            det[:, :4] = utils.scale_coords(img.shape[2:], det[:, :4], im0s.shape).round()
-            person_ind = [i for i, cls in enumerate(det[:, -1]) if int(cls) == 0]   
-            xyxy = det[person_ind, :-2]  # find person only
-            # xyxy = det[:,:-2]
-            xywh_boxes = utils.xyxy2xywh(xyxy)
-            tlwh_boxes = utils.xywh2tlwh(xywh_boxes)
-            confidence = det[:, -2]
-            if use_gpu:
-                tlwh_boxes = tlwh_boxes.cpu()
-            features = encoder(bgr_image, tlwh_boxes)
-            
-            detections = [detection.Detection(bbox, confidence, 'person', feature) for bbox, confidence, feature in zip(tlwh_boxes, confidence, features)]
+                # Call the tracker
+                tracker.predict()
+                tracker.update(detections)
 
-            # Call the tracker
-            tracker.predict()
-            tracker.update(detections)
+                for track in tracker.tracks:
+                    if not track.is_confirmed() or track.time_since_update > 1:
+                        continue
 
-
-            ppl_count = 0   
-            for track in tracker.tracks:
-                if not track.is_confirmed() or track.time_since_update > 1:
-                    continue
-
-                bbox = track.to_tlbr()
-                boxes.append([bbox[0], bbox[1], bbox[2], bbox[3]])
-                indexIDs.append(track.track_id) # # this frame we have these ppl idxs
-                memory[track.track_id] = [bbox[0], bbox[1], bbox[2], bbox[3]]  # this frame we have these ppl boxes
-                ppl_count += 1
-                if save_img or save_video:
-                    center_x = int((bbox[0] + bbox[2]) / 2)
-                    center_y = int((bbox[1] + bbox[3]) / 2)
-                    cv2.rectangle(bgr_image, (int(bbox[0]), int(bbox[1])), (int(bbox[2]), int(bbox[3])), (255, 255, 255), 2)
-                    cv2.putText(bgr_image, "ID: " + str(track.track_id), (int(center_x), int(center_y)), 0,
-                                        1e-3 * bgr_image.shape[0], (0, 255, 0), 1)
+                    bbox = track.to_tlbr()
+                    boxes.append([bbox[0], bbox[1], bbox[2], bbox[3]])
+                    indexIDs.append(track.track_id) # # this frame we have these ppl idxs
+                    ppl_count += 1
 
 
-            if ppl_count > 0:
-                for i, box in enumerate(boxes):
-                    if indexIDs[i] in previous:
-                        center_x = int((box[0] + box[2]) / 2)
-                        center_y = int((box[1] + box[3]) / 2)
-                        p0 = (center_x, center_y)
-                        previous_box = previous[indexIDs[i]]
-                        center_x2 = int((previous_box[0] + previous_box[2]) / 2)
-                        center_y2 = int((previous_box[1] + previous_box[3]) / 2)
-                        p1 = (center_x2, center_y2)
-
-                        # cv2.line(bgr_image, p0, p1, (0, 255, 0), 3)
-
-                        if utils.intersect(p0, p1, line[0], line[1]):
-                            if utils.below_line(line, p0): 
-                                out_counter += 1
-                            else: 
-                                in_counter += 1
-                thisFrameRes = [frame_idx, ppl_count, indexIDs]
-                if lastFrameRes and (thisFrameRes[1] != lastFrameRes[1] or thisFrameRes[2] != lastFrameRes[2]):
+            thisFrameRes = [frame_idx, ppl_count, indexIDs]
+            if not lastFrameRes:
+                lastFrameRes = copy.deepcopy(thisFrameRes)
+            if thisFrameRes[1] != lastFrameRes[1] or thisFrameRes[2] != lastFrameRes[2]:
+                if lastFrameRes[1] > 0:
                     f.write(str(lastFrameRes[0]))
                     f.write(",")
                     f.write(str(datetime.timedelta(seconds=lastFrameRes[0]//25)))
@@ -164,23 +129,8 @@ def run(
                         f.write(str(trackid))
                         f.write(" ")
                     f.write("\n")
-                thisFrameRes = lastFrameRes
-                if save_img or save_video:
-                    cv2.line(bgr_image, line[0], line[1], (0, 255, 255), 2)  # 画出计数线
-                    cv2.putText(bgr_image, "In: {}".format(str(in_counter)), (100, 50),
-                        cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 255, 255), 2)
-                    cv2.putText(bgr_image, "Out: {}".format(str(out_counter)), (200, 50),
-                        cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 255, 255), 2)
-                    cv2.putText(bgr_image, "Flux: {}".format(str(in_counter + out_counter)), (100, 100),
-                        cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 255, 255), 2)
-
-                if save_img:
-                    image_path = dir_path / Path(str(frame_idx) + ".jpg")
-                    cv2.imwrite(str(image_path), bgr_image)
-                if save_video:
-                    video_writer.write(bgr_image)
-        if save_video:
-            video_writer.release()
+                lastFrameRes = copy.deepcopy(thisFrameRes)
+                
                 
 
 def parse_opt():
@@ -194,8 +144,6 @@ def parse_opt():
     parser.add_argument('--device', default='cpu', help='cuda device, i.e. 0 or 0,1,2,3 or cpu')
     parser.add_argument('--debug-frames', type=int, default=0, help='debug mode, run till frame number x')
     parser.add_argument('--half', action='store_true', help='use FP16 half-precision inference, supported on CUDA only')
-    parser.add_argument('--save-img', action='store_true', help='save detection output as image')
-    parser.add_argument('--save-video', action='store_true', help='save detection output as an video')
     opt = parser.parse_args()
     return opt
 
