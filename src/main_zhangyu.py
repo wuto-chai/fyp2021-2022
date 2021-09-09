@@ -60,8 +60,6 @@ def run(
     with p.open('w') as f:
         f.write("start_frame,start_time,end_frame,end_time,num,idx\n")
         for _, img, im0s, _, frame_idx in tqdm(dataset):
-            if frame_idx < 2900:
-              continue
             if debug_frames > 0 and frame_idx > debug_frames:
                 break
             
