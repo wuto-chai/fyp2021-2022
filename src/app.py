@@ -6,6 +6,8 @@ from flask import Flask, flash, request, redirect, render_template, url_for
 from werkzeug.utils import secure_filename
 from io import BytesIO
 import server_main
+import cv2
+import numpy as np
 
 UPLOAD_FOLDER = './upload'
 ALLOWED_EXTENSIONS = {'mp4', 'png', 'jpg', 'jpeg'}
@@ -14,7 +16,7 @@ app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
 if __name__ == '__main__':
-    app.run(host="0.0.0.0")
+    app.run(host="0.0.0.0", debug=True)
 
 
 def allowed_file(filename):
@@ -69,7 +71,12 @@ def upload_file():
         if file and allowed_file(file.filename):
             filename = secure_filename(file.filename)
             file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
-        server_main.run(source=file, save_img=True, device='0', output_dir=UPLOAD_FOLDER)
+
+          #  with open(os.path.join(app.config['UPLOAD_FOLDER'], filename), 'rb') as image:
+          #      result_str = base64.b64encode(image.read())
+
+        #str = result_str.decode()
+        server_main.run(source=file, save_img=True, output_dir=UPLOAD_FOLDER)
         result = read_result()
     return render_template('base.html', data=result[1][-1], pic=draw_pic(result[0], result[1]))
     # return redirect(url_for('test'))
