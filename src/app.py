@@ -23,7 +23,7 @@ def allowed_file(filename):
 
 
 def read_result():
-    with open('./upload/output.txt', 'r') as f:
+    with open(os.path.join(app.config['UPLOAD_FOLDER'], 'output.txt'), 'r') as f:
         x_vals = ["0:00:00"]
         y_vals = [0]
         for line in f.readlines():
@@ -69,7 +69,7 @@ def upload_file():
         if file and allowed_file(file.filename):
             filename = secure_filename(file.filename)
             file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
-        server_main.run(source=file, save_img=True, device='0', output_dir='./upload')
+        server_main.run(source=file, save_img=True, device='0', output_dir=UPLOAD_FOLDER)
         result = read_result()
     return render_template('base.html', data=result[1][-1], pic=draw_pic(result[0], result[1]))
     # return redirect(url_for('test'))
