@@ -72,11 +72,7 @@ def upload_file():
             filename = secure_filename(file.filename)
             file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
 
-          #  with open(os.path.join(app.config['UPLOAD_FOLDER'], filename), 'rb') as image:
-          #      result_str = base64.b64encode(image.read())
-
-        #str = result_str.decode()
-        server_main.run(source=file, save_img=True, output_dir=UPLOAD_FOLDER)
+        server_main.run(source=os.path.join(app.config['UPLOAD_FOLDER'], filename), save_img=True, output_dir=UPLOAD_FOLDER)
         result = read_result()
     return render_template('base.html', data=result[1][-1], pic=draw_pic(result[0], result[1]))
     # return redirect(url_for('test'))
