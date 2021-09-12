@@ -39,7 +39,8 @@ def read_result():
 def draw_pic(x_vals, y_vals):
     x = x_vals
     tick_spacing = x
-    tick_spacing = int(len(x_vals) / 10)
+    if len(x_vals) > 10:
+        tick_spacing = int(len(x_vals) / 10)
     fig, ax = plt.subplots(1, 1, figsize=(10, 8))
     ax.plot(x_vals, y_vals, 'o-')
     ax.xaxis.set_major_locator(ticker.MultipleLocator(tick_spacing))
