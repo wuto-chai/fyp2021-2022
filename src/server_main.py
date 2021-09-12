@@ -59,7 +59,7 @@ def run(
     file_path = Path('output.txt')
     dir_path.mkdir(exist_ok=True)
     p = Path(output_dir) / file_path
-    with p.open('a') as f:
+    with p.open('w') as f:
         if save_video:
             for _, img, im0s, _, frame_idx in dataset:
                 height, width, _ = im0s.shape

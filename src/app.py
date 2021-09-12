@@ -10,6 +10,7 @@ import server_main
 
 UPLOAD_FOLDER = 'upload'
 OUTPUT_DIR = 'out'
+
 ALLOWED_EXTENSIONS = {'mp4', 'avi'}
 
 app = Flask(__name__)
@@ -72,11 +73,9 @@ def upload_file():
         if file:
             filename = secure_filename(file.filename)
             filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-            if allowed_file(file.filename):
-                file.save(filepath)
-                server_main.run(filepath, save_img=True, device='cpu', output_dir=OUTPUT_DIR)
-                result = read_result()
-                os.remove(filepath)
-                return render_template('base.html', data=result[1][-1], pic=draw_pic(result[0], result[1]))
+            file.save(filepath)
+            server_main.run(source=filepath, save_img=True, device='cpu', output_dir=OUTPUT_DIR)
+            result = read_result()
+            os.remove(filepath)
+            return render_template('base.html', data=result[1][-1], pic=draw_pic(result[0], result[1]))
         return render_template('base.html')
-    # return redirect(url_for('test'))
