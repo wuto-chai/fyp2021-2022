@@ -16,7 +16,7 @@ from deep_sort import detection
 
 
 def run(
-    weights='yolov5l_best.pt',  # model.pt path(s)
+    weights='../model/yolov5l_best.pt',  # model.pt path(s)
     source='frames',  # file/dir/URL/glob, 0 for webcam
     output_dir='out', 
     device='cpu',  # cuda device, i.e. 0 or 0,1,2,3 or cpu
@@ -43,7 +43,7 @@ def run(
     if half:
         model.half()
     
-    encoder = create_box_encoder('mars-small128.pb', batch_size=32)
+    encoder = create_box_encoder('../model/mars-small128.pb', batch_size=32)
     max_cosine_distance = 0.2
     nn_budget = None
     
@@ -59,7 +59,7 @@ def run(
     file_path = Path('output.txt')
     dir_path.mkdir(exist_ok=True)
     p = Path(output_dir) / file_path
-    with p.open('a') as f:
+    with p.open('w') as f:
         if save_video:
             for _, img, im0s, _, frame_idx in dataset:
                 height, width, _ = im0s.shape
@@ -179,7 +179,7 @@ def run(
 
 def parse_opt():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--weights', nargs='+', type=str, default='yolov5s.pt', help='model.pt path(s)')
+    parser.add_argument('--weights', nargs='+', type=str, default='../model/yolov5l_best.pt', help='model.pt path(s)')
     parser.add_argument('--source', type=str, default='data/images', help='file/dir/URL/glob, 0 for webcam')
     parser.add_argument('--output-dir', type=str, default='out', help='dir for ouput files')
     parser.add_argument('--conf-thres', type=float, default=0.25, help='confidence threshold')
