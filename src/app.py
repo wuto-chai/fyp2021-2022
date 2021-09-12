@@ -1,3 +1,4 @@
+from logging import DEBUG
 import os
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
@@ -7,11 +8,13 @@ from werkzeug.utils import secure_filename
 from io import BytesIO
 import server_main
 
-UPLOAD_FOLDER = './upload'
-ALLOWED_EXTENSIONS = {'mp4', 'png', 'jpg', 'jpeg'}
+UPLOAD_FOLDER = 'upload'
+OUTPUT_DIR = 'out'
+ALLOWED_EXTENSIONS = {'mp4', 'avi'}
 
 app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+app.config['DEBUG'] = True
 
 if __name__ == '__main__':
     app.run(host="0.0.0.0")
@@ -23,7 +26,7 @@ def allowed_file(filename):
 
 
 def read_result():
-    with open('./upload/output.txt', 'r') as f:
+    with open(os.path.join(OUTPUT_DIR, 'output.txt'), 'r') as f:
         x_vals = ["0:00:00"]
         y_vals = [0]
         for line in f.readlines():
@@ -66,10 +69,14 @@ def upload_file():
         if file.filename == '':
             flash('No selected file')
 
-        if file and allowed_file(file.filename):
+        if file:
             filename = secure_filename(file.filename)
-            file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
-        server_main.run(source=file, save_img=True, device='0', output_dir='./upload')
-        result = read_result()
-    return render_template('base.html', data=result[1][-1], pic=draw_pic(result[0], result[1]))
+            filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+            if allowed_file(file.filename):
+                file.save(filepath)
+                server_main.run(filepath, save_img=True, device='cpu', output_dir=OUTPUT_DIR)
+                result = read_result()
+                os.remove(filepath)
+                return render_template('base.html', data=result[1][-1], pic=draw_pic(result[0], result[1]))
+        return render_template('base.html')
     # return redirect(url_for('test'))
