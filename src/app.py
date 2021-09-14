@@ -8,6 +8,7 @@ from io import BytesIO
 import server_main
 import cv2
 import numpy as np
+import math
 
 UPLOAD_FOLDER = './upload'
 ALLOWED_EXTENSIONS = {'mp4', 'png', 'jpg', 'jpeg'}
@@ -39,8 +40,7 @@ def read_result():
 def draw_pic(x_vals, y_vals):
     x = x_vals
     tick_spacing = x
-    if len(x_vals) > 10:
-        tick_spacing = int(len(x_vals) / 10)
+    tick_spacing = math.ceil(len(x_vals) / 10)
     fig, ax = plt.subplots(1, 1, figsize=(10, 8))
     ax.plot(x_vals, y_vals, 'o-')
     ax.xaxis.set_major_locator(ticker.MultipleLocator(tick_spacing))
@@ -73,7 +73,7 @@ def upload_file():
             filename = secure_filename(file.filename)
             file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
 
-        server_main.run(source=os.path.join(app.config['UPLOAD_FOLDER'], filename), save_img=True, output_dir=UPLOAD_FOLDER)
+        server_main.run(source=os.path.join(app.config['UPLOAD_FOLDER'], filename), output_dir=UPLOAD_FOLDER)
         result = read_result()
     return render_template('base.html', data=result[1][-1], pic=draw_pic(result[0], result[1]))
     # return redirect(url_for('test'))
