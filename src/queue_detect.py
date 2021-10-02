@@ -18,16 +18,15 @@ from my_utils import utils
 from deep_sort import detection
 
 
-
 def run(
-    weights='yolov5l.pt',  # model.pt path(s)
+    weights='yolov5s.pt',  # model.pt path(s)
     source='frames',  # file/dir/URL/glob, 0 for webcam
     output_dir='out', 
     device='cpu',  # cuda device, i.e. 0 or 0,1,2,3 or cpu
     conf_thres=0.5,  # confidence threshold
     iou_thres=0.45,  # NMS IOU threshold
     line=[0, 300, 1000, 200], # boundary crossing line
-    queue_polygon=[526,215,1106,929],   # x y x y x y x y x y
+    queue_polygon=[181,568,936,350,1071,655,252,928],   # x y x y x y x y x y
     displacement_thres=10, # count stationary person only
     debug_frames=0, # debug mode
     half=False,  # use FP16 half-precision inference
@@ -50,7 +49,7 @@ def run(
     if half:
         model.half()
     
-    encoder = create_box_encoder('mars-small128.pb', batch_size=32)
+    encoder = create_box_encoder('model/mars-small128.pb', batch_size=32)
     max_cosine_distance = 0.2
     nn_budget = None
     
@@ -166,12 +165,12 @@ def run(
 def parse_opt():
     parser = argparse.ArgumentParser()
     parser.add_argument('--weights', nargs='+', type=str, default='yolov5s.pt', help='model.pt path(s)')
-    parser.add_argument('--source', type=str, default='data/images', help='file/dir/URL/glob, 0 for webcam')
+    parser.add_argument('--source', type=str, default='target_video.mp4', help='file/dir/URL/glob, 0 for webcam')
     parser.add_argument('--output-dir', type=str, default='out', help='dir for ouput files')
     parser.add_argument('--conf-thres', type=float, default=0.25, help='confidence threshold')
     parser.add_argument('--iou-thres', type=float, default=0.45, help='NMS IoU threshold')
     parser.add_argument('--line', nargs='+', type=int, default=[0, 300, 1000, 200], help='boundary crossing line')
-    parser.add_argument('--queue-polygon', nargs='+', type=int, default=[526,215,1106,929], help='queue area')
+    parser.add_argument('--queue-polygon', nargs='+', type=int, default=[181,568,936,350,1071,655,252,928], help='queue area')
     parser.add_argument('--displacement-thres', type=int, default=10, help='not count person with large displacement between frames')
     parser.add_argument('--device', default='cpu', help='cuda device, i.e. 0 or 0,1,2,3 or cpu')
     parser.add_argument('--debug-frames', type=int, default=0, help='debug mode, run till frame number x')
