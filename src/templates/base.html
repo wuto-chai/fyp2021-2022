@@ -1,5 +1,28 @@
 <!DOCTYPE html>
 <html lang="en">
+<script>
+    var positions = new Array();
+    var result= "";
+    function getMouse(event){
+        //mouse position
+        var x = event.clientX;
+        var y = event.clientY;
+        //image position
+        var img = document.getElementById("image");
+        var xx = img.offsetLeft;
+        var yy = img.offsetTop
+        positions.push(x-xx);
+        positions.push(y-yy);
+        result += "(" + x-xx + ", " + y-yy+")  ";
+        document.getElementById("position").innerHTML= result;
+    }
+    function send_back(event){
+        var result = JSON.stringify(positions);
+        const xmlhttp = new XMLHttpRequest();
+        xmlhttp.open("POST","/test",true);
+        xmlhttp.send(result);
+    }
+</script>
 <head>
     <meta charset="UTF-8">
     <title>Upload new File</title>
@@ -10,9 +33,11 @@
       <input type=file name=file>
       <input type=submit value=Upload >
     </form>
-<p>The number of counted people is {{ data }}</p>
+   <button type="button" onclick="send_back(event)">finish</button>
 
-<p><img src="{{ pic }}"></p>
+<!--原本用的{{pic}}-->
+<p><img id="image"onclick="getMouse(event)" src={{pic}}></p>
+<p id="position"></p>
 
 
 </body>

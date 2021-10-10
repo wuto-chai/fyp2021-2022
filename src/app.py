@@ -72,8 +72,23 @@ def upload_file():
         if file and allowed_file(file.filename):
             filename = secure_filename(file.filename)
             file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+            # display image
+            with open(os.path.join(app.config['UPLOAD_FOLDER'], filename), 'rb') as img:
+                img_stream = img.read()
+            path = base64.b64encode(img_stream).decode()
+            path = "data:image/png;base64," + path
+            return render_template('base.html', pic=path)
 
-        server_main.run(source=os.path.join(app.config['UPLOAD_FOLDER'], filename), output_dir=UPLOAD_FOLDER)
-        result = read_result()
-    return render_template('base.html', data=result[1][-1], pic=draw_pic(result[0], result[1]))
+        # server_main.run(source=os.path.join(app.config['UPLOAD_FOLDER'], filename), output_dir=UPLOAD_FOLDER)
+        # result = read_result()
+    # return render_template('base.html', data=result[1][-1], pic=draw_pic(result[0], result[1]))
     # return redirect(url_for('test'))
+
+
+@app.route('/test', methods=['GET', 'POST'])
+def retrieve_position():
+    if request.method == 'POST':
+        # result is here
+        result = request.data
+        print(result)
+        return "<p>Hello, World!</p>"
