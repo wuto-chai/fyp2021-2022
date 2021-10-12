@@ -5,15 +5,15 @@
     var result= "";
     function getMouse(event){
         //mouse position
-        var x = event.clientX;
-        var y = event.clientY;
+        var x = event.clientX + pageXOffset;
+        var y = event.clientY + pageYOffset;
         //image position
         var img = document.getElementById("image");
         var xx = img.offsetLeft;
         var yy = img.offsetTop
         positions.push(x-xx);
         positions.push(y-yy);
-        result += "(" + x-xx + ", " + y-yy+")  ";
+        result += "(" + (x-xx) + ", " + (y-yy)+")  ";
         document.getElementById("position").innerHTML= result;
     }
     function send_back(event){
