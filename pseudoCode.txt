@@ -1,0 +1,33 @@
+queue_time = {}
+queue = {}
+potential_queue = {}
+for每一帧:
+    for 每个detect到的queue_area里面人:
+        
+        if in potential_queue:
+            its accumulated_frames += 1
+            if accumulated_frames > fps * 临界秒数（比如十秒）* 90%:
+                queue.add({track_id: (start_frame=potential_queue里就开始累计的开始帧,position, last_frame=potential_queue里就开始累计的开始帧, finishQueueing=False)})
+                potential_queue移除该记录
+        elif in queue:
+            update position, last_frame
+        else:
+            potential_queue.add({track_id: (start_frame=frame_idx, accumulated_frames=0)})
+    # queuer一旦出队 就立刻不再标记位置
+
+    for queuer in queue:
+        queuer.last_frame = frame_idx
+        if queuer in finish_area:
+            queuer.finishQueueing = True
+        if queuer not in queue_area:
+            if queuer.last_frame - queuer.start_frame > 临界秒数(比如十秒) * fps:
+                if queuer.finishQueueing == True:
+                    queueing_time = (queuer.last_frame - queuer.start_frame) / fps - 临界秒数
+                    queue_time[queuer.id] = queueing_time
+                queue移除该记录
+
+
+
+
+
+对于所有确定了的queuer 一旦他进入finish area 超过一个短阈值 比如一秒 就给标记上排队完成 对于离开queueing area的人 仍是 若超过五秒之后仍离队则记作离队 但仅对标记排队完成的人计算时间
