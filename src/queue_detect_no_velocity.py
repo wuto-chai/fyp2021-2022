@@ -67,7 +67,6 @@ def run(
     dir_path = Path(output_dir)
     file_path = Path('output.txt')
     dir_path.mkdir(exist_ok=True)
-    p = Path(output_dir) / file_path
     if save_video:
         for _, img, im0s, _, frame_idx in dataset:
             height, width, _ = im0s.shape
