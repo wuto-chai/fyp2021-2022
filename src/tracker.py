@@ -117,7 +117,8 @@ def run(
                     start_frame = potential_queue[track_id].start_frame
                     potential_queue[track_id].accumulated_frames += 1
                     accumulated_frames = potential_queue[track_id].accumulated_frames
-                    if frame_idx -  start_frame > enqueue_thres * fps and accumulated_frames > enqueue_thres * 0.9 * fps:
+                    elapse_frames = frame_idx -  start_frame
+                    if elapse_frames > enqueue_thres * fps and accumulated_frames > elapse_frames * 0.8:
                         queue[track_id] = Queuer(start_frame, (center_x, center_y), start_frame, False, None)
                         in_queueing_area.append(track_id)
                         del potential_queue[track_id]
@@ -153,7 +154,7 @@ def run(
 
 
         for track_id in list(queue.keys()):
-            queueing_time = (queue[track_id].last_frame - queue[track_id].start_frame) / fps
+            queueing_time = round((queue[track_id].last_frame - queue[track_id].start_frame) / fps, 1)
             queue_time[track_id] = queueing_time
             if not queue[track_id].enter_finish_area_frame and finish_polyogn.intersects(Point(queue[track_id].position)):
                 queue[track_id].enter_finish_area_frame = frame_idx
@@ -167,6 +168,7 @@ def run(
                     queueing_time = (queue[track_id].last_frame - queue[track_id].start_frame) / fps
                     queue_time[track_id] = queueing_time
                 '''
+                del queue_time[track_id]
                 del queue[track_id]
         if save_video:
             video_writer.write(bgr_image)
