@@ -5,10 +5,12 @@ import base64
 from flask import Flask, flash, request, redirect, render_template, url_for
 from werkzeug.utils import secure_filename
 from io import BytesIO
-import server_main
+
+#import server_main
 import cv2
 import numpy as np
 import math
+
 
 UPLOAD_FOLDER = './upload'
 ALLOWED_EXTENSIONS = {'mp4', 'png', 'jpg', 'jpeg'}
