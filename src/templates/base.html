@@ -3,24 +3,55 @@
 <script>
     var positions = new Array();
     var result= "";
+    var counter = -1;
+
+    window.onload = function(){
+        var c = document.getElementById("myCanvas");
+        var ctx = c.getContext("2d");
+        var img = document.getElementById("image")
+        c.width = img.width;
+        c.height = img.height;
+        ctx.drawImage(img,0,0);
+       // ctx.fillStyle = "#FF0000";
+    }
     function getMouse(event){
         //mouse position
-        var x = event.clientX;
-        var y = event.clientY;
+        var x = event.clientX + window.pageXOffset;
+        var y = event.clientY + window.pageYOffset;
         //image position
-        var img = document.getElementById("image");
+        var img = document.getElementById("myCanvas");
         var xx = img.offsetLeft;
-        var yy = img.offsetTop
-        positions.push(x-xx);
-        positions.push(y-yy);
-        result += "(" + x-xx + ", " + y-yy+")  ";
+        var yy = img.offsetTop;
+        var x_cor = x-xx;
+        var y_cor = y-yy;
+        positions.push(x_cor);
+        positions.push(y_cor);
+        result += "(" + x_cor + ", " + y_cor +")  ";
         document.getElementById("position").innerHTML= result;
+        //trying draw lines
+        var c = document.getElementById("myCanvas");
+        var ctx = c.getContext("2d");
+        if(counter==-1){
+            ctx.moveTo(positions[++counter], positions[++counter]);
+        }
+        else{
+            ctx.lineTo(positions[++counter], positions[++counter]);
+            ctx.stroke();
+        }
+
     }
     function send_back(event){
         var result = JSON.stringify(positions);
         const xmlhttp = new XMLHttpRequest();
         xmlhttp.open("POST","/test",true);
         xmlhttp.send(result);
+    }
+    function finish_drawing(event){
+        var c = document.getElementById("myCanvas");
+        var ctx = c.getContext("2d");
+        ctx.moveTo(positions[counter-1],positions[counter]);
+        ctx.lineTo(positions[0],positions[1]);
+        ctx.stroke();
     }
 </script>
 <head>
@@ -31,14 +62,14 @@
    <h1>Upload new File</h1>
 <form  method="post" enctype=multipart/form-data>
       <input type=file name=file>
-      <input type=submit value=Upload >
+      <input type=submit value=Upload>
     </form>
    <button type="button" onclick="send_back(event)">finish</button>
+   <button type="button" onclick="finish_drawing(event)">闭合</button>
 
 <!--原本用的{{pic}}-->
-<p><img id="image"onclick="getMouse(event)" src={{pic}}></p>
+<p><img id="image" src={{pic}} style="display: none;"></p>
+<canvas id="myCanvas" onclick="getMouse(event)"></canvas>
 <p id="position"></p>
-
-
 </body>
 </html>
