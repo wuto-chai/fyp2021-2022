@@ -2,32 +2,47 @@ queue_time = {}
 queue = {}
 potential_queue = {}
 for每一帧:
-    for 每个detect到的queue_area里面人:
-        
+    for 每个detect到的queue_area里面人,即track:
         if in potential_queue:
             its accumulated_frames += 1
             if accumulated_frames > fps * 临界秒数（比如十秒）* 90%:
-                queue.add({track_id: (start_frame=potential_queue里就开始累计的开始帧,position, last_frame=potential_queue里就开始累计的开始帧, finishQueueing=False)})
+                queue.add({track_id: (start_frame=potential_queue里就开始累计的开始帧,position, last_frame=potential_queue里就开始累计的开始帧, finish_queueing=False, None)})
                 potential_queue移除该记录
         elif in queue:
-            update position, last_frame
-        else:
-            potential_queue.add({track_id: (start_frame=frame_idx, accumulated_frames=0)})
+            if queuer.enter_finish_area_frame == None:
+                update last_frame  # 一旦进入finish area 不再标记last_frame
+            update position
+        else: # new queuer, add to queue
+            addToPotential = True
+            for existing queuer in queue:
+                if abs(queuer.position-track.position) < identity_switch_thres:
+                    new queuer2 = queuer
+                    queuer2.id = track_id
+                    queue.add(queuer2)
+                    addToPotential = False
+                    移除queuer
+                    break
+            if addToPotential:
+                potential_queue.add({track_id: (start_frame=frame_idx, accumulated_frames=0)})
     # queuer一旦出队 就立刻不再标记位置
 
     for queuer in queue:
-        queuer.last_frame = frame_idx
-        if queuer in finish_area:
-            queuer.finishQueueing = True
-        if queuer not in queue_area:
-            if queuer.last_frame - queuer.start_frame > 临界秒数(比如十秒) * fps:
-                if queuer.finishQueueing == True:
-                    queueing_time = (queuer.last_frame - queuer.start_frame) / fps - 临界秒数
-                    queue_time[queuer.id] = queueing_time
-                queue移除该记录
+        outside_time = (frame_idx - queuer.last_frame) / fps
+        if queuer.enter_finish_area_frame == None and queuer in finish_area:
+            queuer.enter_finish_area_frame = frame_idx
+        if queuer.finish_queueing == False:
+            inside_finish_area_time = (frame_idx - queuer.enter_finish_area_frame) / fps
+            if inside_finish_area_time > 一秒:
+                queuer.finish_queueing = True
+        if queuer not in queue_area && outside_time > 临界秒数(比如十秒) * fps:
+            if queuer.finish_queueing == True:
+                queueing_time = (queuer.last_frame - queuer.start_frame) / fps - 临界秒数
+                queue_time[queuer.id] = queueing_time
+            queue移除该记录
 
 
 
 
 
 对于所有确定了的queuer 一旦他进入finish area 超过一个短阈值 比如一秒 就给标记上排队完成 对于离开queueing area的人 仍是 若超过五秒之后仍离队则记作离队 但仅对标记排队完成的人计算时间
+注意queueing_area不包括已经排完队正在接受服务的人 算法亦不统计已经排完队的人
