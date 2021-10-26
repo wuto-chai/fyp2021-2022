@@ -1,8 +1,7 @@
 #@title linear_assignment
 
 import numpy as np
-#from scipy.optimize import linear_sum_assignment as linear_assignment
-from sklearn.utils.linear_assignment_ import linear_assignment
+from scipy.optimize import linear_sum_assignment as linear_assignment
 from . import kalman_filter
 
 
@@ -56,7 +55,8 @@ def min_cost_matching(
     cost_matrix = distance_metric(
         tracks, detections, track_indices, detection_indices)
     cost_matrix[cost_matrix > max_distance] = max_distance + 1e-5
-    indices = linear_assignment(cost_matrix)
+    row_ind, col_ind = linear_assignment(cost_matrix)
+    indices = np.array(list(zip(row_ind, col_ind)))
 
     matches, unmatched_tracks, unmatched_detections = [], [], []
     for col, detection_idx in enumerate(detection_indices):

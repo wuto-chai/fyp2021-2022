@@ -234,3 +234,6 @@ def below_line(line, point): # direction from line[0] to line[1]
 
 def in_box(point, box):
     return point[0] > box[0][0] and point[0] < box[1][0] and point[1] > box[0][1] and point[1] < box[1][1]
+
+def isLeft(line,  cX, cY):
+    return ((line[2] - line[0])*(cY - line[1]) - (line[3] - line[1])*(cX - line[0])) < 0
