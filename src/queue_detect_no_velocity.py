@@ -25,9 +25,9 @@ def run(
     output_dir='out', 
     device='cpu',  # cuda device, i.e. 0 or 0,1,2,3 or cpu
     conf_thres=0.5,  # confidence threshold
-    iou_thres=0.45,  # NMS IOU threshold
+    iou_thres=0.2,  # NMS IOU threshold
     line=[0, 300, 1000, 200], # boundary crossing line
-    queue_polygon=[526,215,1106,929],   # x y x y x y x y x y
+    queue_polygon=[717, 101, 1453, 515, 1107, 777, 416, 352],   # x y x y x y x y x y
     enqueue_thres=10, 
     dequeue_thres=10,
     debug_frames=0, # debug mode
@@ -200,10 +200,10 @@ def parse_opt():
     parser.add_argument('--weights', nargs='+', type=str, default='yolov5s.pt', help='model.pt path(s)')
     parser.add_argument('--source', type=str, default='data/images', help='file/dir/URL/glob, 0 for webcam')
     parser.add_argument('--output-dir', type=str, default='out', help='dir for ouput files')
-    parser.add_argument('--conf-thres', type=float, default=0.25, help='confidence threshold')
-    parser.add_argument('--iou-thres', type=float, default=0.45, help='NMS IoU threshold')
+    parser.add_argument('--conf-thres', type=float, default=0.5, help='confidence threshold')
+    parser.add_argument('--iou-thres', type=float, default=0.2, help='NMS IoU threshold')
     parser.add_argument('--line', nargs='+', type=int, default=[0, 300, 1000, 200], help='boundary crossing line')
-    parser.add_argument('--queue-polygon', nargs='+', type=int, default=[526,215,1106,929], help='queue area')
+    parser.add_argument('--queue-polygon', nargs='+', type=int, default=[717, 101, 1453, 515, 1107, 777, 416, 352], help='queue area')
     parser.add_argument('--enqueue-thres', type=int, default=10, help='not count person with large displacement between frames')
     parser.add_argument('--dequeue-thres', type=int, default=10, help='not count person with large displacement between frames')
     parser.add_argument('--device', default='cpu', help='cuda device, i.e. 0 or 0,1,2,3 or cpu')
