@@ -4,7 +4,7 @@ import numpy as np
 import cv2
 import logging
 
-import Net
+from my_utils.Net import Net
 
 
 class Extractor(object):

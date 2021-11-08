@@ -102,7 +102,10 @@ def run(
         confidence = det[:, -2]
         if use_gpu:
             tlwh_boxes = tlwh_boxes.cpu()
-        features = encoder.get_features(xyxy, bgr_image)
+            xyxy = xyxy.cpu()
+        xyxy_boxes = np.array(xyxy).astype(int)
+
+        features = encoder.get_features(xyxy_boxes, bgr_image)
         
         detections = [detection.Detection(bbox, confidence, 'person', feature) for bbox, confidence, feature in zip(tlwh_boxes, confidence, features)]
 
