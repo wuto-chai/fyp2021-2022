@@ -10,7 +10,7 @@ from shapely.geometry import Point
 
 from deep_sort.tracker import Tracker
 from deep_sort import nn_matching
-from my_utils.encoder import create_box_encoder
+from my_utils.encoder_torch import Extractor
 from models.experimental import attempt_load
 from my_utils.my_dataset import LoadImages
 from my_utils import utils
@@ -51,7 +51,7 @@ def run(
     if half:
         model.half()
     
-    encoder = create_box_encoder(str(Path('model') / Path('mars-small128.pb')), batch_size=32)
+    encoder = Extractor(str(Path('model') / Path('ckpt.t7')))
     max_cosine_distance = 0.2
     nn_budget = None
     
@@ -102,7 +102,7 @@ def run(
         confidence = det[:, -2]
         if use_gpu:
             tlwh_boxes = tlwh_boxes.cpu()
-        features = encoder(bgr_image, tlwh_boxes)
+        features = encoder.get_features(xyxy, bgr_image)
         
         detections = [detection.Detection(bbox, confidence, 'person', feature) for bbox, confidence, feature in zip(tlwh_boxes, confidence, features)]
 
