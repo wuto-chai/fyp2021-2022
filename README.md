@@ -7,6 +7,7 @@
 1. mars-small128.pb: `!gdown --id 1oYaVZQ3Cvp8kcMLvpthKMgfF8P30E0Hr` (for deep sort)
 2. yolov5l_best2.pt: `!gdown --id 1zQcGG3jRixytrpPtlDhK71fj0QdMj-Kx` (yolov5l model trained on overlooking viewport, detects person only)
 3. yolo_dead_detection.pt: `!gdown --id 1UULc2Wphdo5A-J-AIQvREoP119t1cj77` (for queue detection, detect heads only)
+4. ckpt.t7: `!gdown --id 1_qwTWdzT9dWNudpusgKavj_4elGgbkUN`(feature extractor on pytorch)
 
 # Sample usage
 1. `!python -Wi src/queue_detect.py --source /content/fyp2021-2022/VIP_queue_video_1.mp4 --save-video --device="0" --debug-frames=$((30*60)) --queue-polygon 211 606 976 319 1034 651 282 893`
