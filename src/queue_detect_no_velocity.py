@@ -78,8 +78,8 @@ def run(
             height, width, _ = im0s.shape
             break
         size = (width, height)
-        fourcc = cv2.VideoWriter_fourcc('m', 'p', '4', 'v')
-        video_writer = cv2.VideoWriter(str(dir_path / Path("out.mp4")), fourcc, fps, size)
+        fourcc = cv2.VideoWriter_fourcc('M','J','P','G')
+        video_writer = cv2.VideoWriter(str(dir_path / Path("out.avi")), fourcc, fps, size)
     for _, img, im0s, _, frame_idx in tqdm(dataset):
         if debug_frames > 0 and frame_idx > debug_frames:
             break
