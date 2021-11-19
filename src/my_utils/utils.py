@@ -1,13 +1,14 @@
 import time
-import numpy as np
-import torch
-import torchvision
 import datetime
 import os
 import platform
 import logging
 import subprocess
 from pathlib import Path
+import numpy as np
+import torch
+import torchvision
+
 
 logger = logging.getLogger(__name__)
 
@@ -224,7 +225,7 @@ def non_max_suppression(prediction, conf_thres=0.25, iou_thres=0.45, classes=Non
 def ccw(A, B, C):  # 两个向量叉乘的计算公式，计数创新点
     return (C[1] - A[1]) * (B[0] - A[0]) > (B[1] - A[1]) * (C[0] - A[0])
 
-def intersect(A, B, C, D):  # C,D是自己画线的两端坐标,用的是向量叉乘的思想，证明A,B在C,D两端 且 C,D在A,B两端
+def intersect(A, B, C, D) -> bool:  # C,D是自己画线的两端坐标,用的是向量叉乘的思想，证明A,B在C,D两端 且 C,D在A,B两端
     return ccw(A, C, D) != ccw(B, C, D) and ccw(A, B, C) != ccw(A, B, D)
 
 def below_line(line, point): # direction from line[0] to line[1]

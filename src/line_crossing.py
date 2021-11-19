@@ -1,28 +1,28 @@
 import argparse
-
+from ordered_set import OrderedSet
 from pathlib import Path
 import numpy as np
 import cv2
 from tqdm import tqdm
 import torch
-from shapely.geometry import Polygon
-from shapely.geometry import Point
 
 from deep_sort.tracker import Tracker
 from deep_sort import nn_matching
-from my_utils.encoder_torch import Extractor
+from deep_sort import detection
+
 from models.experimental import attempt_load
 from my_utils.my_dataset import LoadImages
 from my_utils import utils
-from deep_sort import detection
-from my_utils.queuer import Queuer, PotentialQueuer
+from my_utils.encoder_torch import Extractor
 
-fps = 25
-# crossedMaxLen = 500
+
+FPS = 25
+MEM_CAP = 25
+CROSSED_DURATION = FPS * 8
 def run(
     weights='yolov5l.pt',  # model.pt path(s)
     source='frames',  # file/dir/URL/glob, 0 for webcam
-    output_dir='out', 
+    output_dir='out',
     device='cpu',  # cuda device, i.e. 0 or 0,1,2,3 or cpu
     conf_thres=0.5,  # confidence threshold
     iou_thres=0.2,  # NMS IOU threshold
@@ -43,7 +43,7 @@ def run(
     stride = int(model.stride.max())  # model stride
     if half:
         model.half()
-    
+
     encoder = Extractor(str(Path('model') / Path('ckpt.t7')))
     max_cosine_distance = 0.2
     nn_budget = None
@@ -55,7 +55,9 @@ def run(
     out_counter = 0 # below -> above
     in_counter = 0 # above -> below
     memory = {}
-    crossed = set()
+    frame_memory = {}
+    crossed = OrderedSet()
+    crossed_start_frame = None
     dir_path = Path(output_dir)
     dir_path.mkdir(exist_ok=True)
     if save_video:
@@ -64,15 +66,16 @@ def run(
             break
         size = (width, height)
         fourcc = cv2.VideoWriter_fourcc('M','J','P','G')
-        video_writer = cv2.VideoWriter(str(dir_path / Path("out.avi")), fourcc, fps, size)
+        video_writer = cv2.VideoWriter(str(dir_path / Path("out.avi")), fourcc, FPS, size)
     for _, img, im0s, _, frame_idx in tqdm(dataset):
         if debug_frames > 0 and frame_idx > debug_frames:
             break
-        
-        indexIDs = []
-        boxes = []
-        previous = memory.copy() # last frame we have these ppl boxes
-        memory = {}
+        if crossed_start_frame is None:
+            crossed_start_frame = frame_idx
+        elif (frame_idx - crossed_start_frame) > CROSSED_DURATION:
+            crossed_start_frame = frame_idx
+            crossed = crossed[len(crossed)//2:]
+        frame_memory = {}
 
         img = torch.from_numpy(img).to(device)
         img = img.half() if half else img.float()  # uint8 to fp16/32
@@ -85,7 +88,7 @@ def run(
         
         results = model(img)[0]
         results = utils.non_max_suppression(results, conf_thres, iou_thres)
-        if(results[0].shape[0]==0):
+        if results[0].shape[0]==0:
             continue
 
         det = results[0]
@@ -119,39 +122,41 @@ def run(
             center_x = int((bbox[0] + bbox[2]) / 2)
             center_y = int((bbox[1] + bbox[3]) / 2)
 
-            cv2.putText(bgr_image, "ID: " + str(track_id), (int(center_x), int(center_y)), 0,
-                    1e-3 * bgr_image.shape[0], (255, 0, 0), 1)
+            cv2.putText(bgr_image, str(track_id), (int(center_x), int(center_y)), 0,
+                    1e-3 * bgr_image.shape[0], (0, 255, 0), 1)
 
-            boxes.append((bbox[0], bbox[1], bbox[2], bbox[3]))
             cv2.rectangle(bgr_image, (int(bbox[0]), int(bbox[1])), (int(bbox[2]), int(bbox[3])), (0, 0, 255), 2)
-            indexIDs.append(track_id) # this frame we have these ppl idxs
-            memory[track_id] = (bbox[0], bbox[1], bbox[2], bbox[3])  # this frame we have these ppl boxes
-        for i, box in enumerate(boxes):
-            if indexIDs[i] in previous and indexIDs[i] not in crossed:
-                center_x = int((box[0] + box[2]) / 2)
-                center_y = int((box[1] + box[3]) / 2)
-                p0 = (center_x, center_y)
-                previous_box = previous[indexIDs[i]]
-                center_x2 = int((previous_box[0] + previous_box[2]) / 2)
-                center_y2 = int((previous_box[1] + previous_box[3]) / 2)
-                p1 = (center_x2, center_y2)
+            frame_memory[track_id] = bbox  # this frame we have these ppl boxes
+        if len(memory) == MEM_CAP and frame_memory:
+            for idx in frame_memory.keys() & memory[frame_idx%MEM_CAP].keys():
+                if idx not in crossed:
+                    box = frame_memory[idx]
+                    center_x = int((box[0] + box[2]) / 2)
+                    center_y = int((box[1] + box[3]) / 2)
+                    if center_y == line[0][1]:
+                        continue
+                    p0 = (center_x, center_y)
+                    previous_box = memory[frame_idx%MEM_CAP][idx]
+                    center_x2 = int((previous_box[0] + previous_box[2]) / 2)
+                    center_y2 = int((previous_box[1] + previous_box[3]) / 2)
+                    p1 = (center_x2, center_y2)
 
-                # cv2.line(bgr_image, p0, p1, (0, 255, 0), 3)
+                    # cv2.line(bgr_image, p0, p1, (0, 255, 0), 3)
 
-                if utils.intersect(p0, p1, line[0], line[1]):
-                    crossed.add(indexIDs[i])
-                    if utils.below_line(line, p0): 
-                        out_counter += 1
-                    else: 
-                        in_counter += 1
-
+                    if utils.intersect(p0, p1, line[0], line[1]):
+                        crossed.add(idx)
+                        if utils.below_line(line, p0):
+                            out_counter += 1
+                        else:
+                            in_counter += 1
+        memory[frame_idx%MEM_CAP] = frame_memory.copy()
         if save_video:
             cv2.line(bgr_image, line[0], line[1], (0, 255, 255), 2)  # 画出计数线
-            cv2.putText(bgr_image, "In: {}".format(str(in_counter)), (100, 50),
+            cv2.putText(bgr_image, f"In: {in_counter}", (100, 50),
                 cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 255, 255), 2)
-            cv2.putText(bgr_image, "Out: {}".format(str(out_counter)), (200, 50),
+            cv2.putText(bgr_image, f"Out: {out_counter}", (200, 50),
                 cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 255, 255), 2)
-            cv2.putText(bgr_image, "Flux: {}".format(str(in_counter + out_counter)), (100, 100),
+            cv2.putText(bgr_image, f"Flux: {in_counter + out_counter}", (100, 100),
                 cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 255, 255), 2)
             video_writer.write(bgr_image)
 
