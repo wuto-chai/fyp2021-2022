@@ -113,10 +113,11 @@ def run(
 
 
 
-        
+        ppl_count = 0
         for track in tracker.tracks:
             if not track.is_confirmed() or track.time_since_update > 1:
                 continue
+            ppl_count += 1
             track_id = track.track_id
             bbox = track.to_tlbr()
             center_x = int((bbox[0] + bbox[2]) / 2)
@@ -157,6 +158,8 @@ def run(
             cv2.putText(bgr_image, f"Out: {out_counter}", (200, 50),
                 cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 255, 255), 2)
             cv2.putText(bgr_image, f"Flux: {in_counter + out_counter}", (100, 100),
+                cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 255, 255), 2)
+            cv2.putText(bgr_image, f"Count: {ppl_count}", (100, 150),
                 cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 255, 255), 2)
             video_writer.write(bgr_image)
 
